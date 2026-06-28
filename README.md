@@ -63,6 +63,10 @@ feature/* -> dev -> staging -> main
 
 See [docs/BRANCHING.md](docs/BRANCHING.md).
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the current working list.
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) for contribution safety guidelines.
