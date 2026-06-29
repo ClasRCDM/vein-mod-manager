@@ -200,6 +200,7 @@ public sealed partial class ThemedTextBox : TextBox
     {
         base.OnGotFocus(e);
         ApplyVisualColors();
+        ApplyTextMargins();
         Invalidate();
     }
 
@@ -207,12 +208,14 @@ public sealed partial class ThemedTextBox : TextBox
     {
         base.OnLostFocus(e);
         ApplyVisualColors();
+        ApplyTextMargins();
         Invalidate();
     }
 
     protected override void OnTextChanged(EventArgs e)
     {
         base.OnTextChanged(e);
+        ApplyTextMargins();
         Invalidate();
     }
 
@@ -278,7 +281,7 @@ public sealed partial class ThemedTextBox : TextBox
             (IntPtr)((HorizontalTextMargin << 16) | HorizontalTextMargin));
 
         var textHeight = TextRenderer.MeasureText("Ag", Font, Size.Empty, TextFormatFlags.NoPadding).Height;
-        var verticalInset = Math.Max(3, (Height - textHeight) / 2);
+        var verticalInset = Math.Clamp((Height - textHeight) / 2 + 2, 3, Math.Max(3, Height - textHeight - 1));
         var rect = new EditRect
         {
             Left = HorizontalTextMargin,
