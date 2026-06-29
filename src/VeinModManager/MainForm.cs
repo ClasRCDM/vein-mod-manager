@@ -3883,7 +3883,7 @@ public sealed partial class MainForm : Form
             TextColor = TextMain,
             Radius = 8,
             BorderStyle = BorderStyle.None,
-            Font = new Font("Segoe UI", 12F, FontStyle.Regular)
+            Font = new Font("Segoe UI", 11F, FontStyle.Regular)
         };
 
         if (password)

@@ -281,13 +281,13 @@ public sealed partial class ThemedTextBox : TextBox
             (IntPtr)((HorizontalTextMargin << 16) | HorizontalTextMargin));
 
         var textHeight = TextRenderer.MeasureText("Ag", Font, Size.Empty, TextFormatFlags.NoPadding).Height;
-        var verticalInset = Math.Clamp((Height - textHeight) / 2 + 2, 3, Math.Max(3, Height - textHeight - 1));
+        var verticalInset = Math.Max(6, (Height - textHeight) / 2 + 4);
         var rect = new EditRect
         {
             Left = HorizontalTextMargin,
             Top = verticalInset,
             Right = Math.Max(HorizontalTextMargin, Width - HorizontalTextMargin),
-            Bottom = Math.Max(verticalInset + textHeight, Height - verticalInset)
+            Bottom = Math.Max(verticalInset + textHeight, Height - 2)
         };
         SendMessage(Handle, EmSetRect, IntPtr.Zero, ref rect);
     }
