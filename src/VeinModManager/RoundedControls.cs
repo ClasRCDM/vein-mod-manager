@@ -19,7 +19,7 @@ public sealed class RoundedPanel : Panel
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        e.Graphics.Clear(BackColor);
+        e.Graphics.Clear(VisualBackColor(Parent, BackColor));
         using var path = RoundedRect(new Rectangle(1, 1, Width - 3, Height - 3), Radius);
         using var fill = new SolidBrush(FillColor);
         using var pen = new Pen(BorderColor, 1f);
@@ -29,7 +29,6 @@ public sealed class RoundedPanel : Panel
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        // OnPaint paints the full rounded surface, including the outside corners.
     }
 
     internal static GraphicsPath RoundedRect(Rectangle bounds, int radius)
@@ -104,7 +103,6 @@ public sealed class RoundedButton : Button
 
     protected override void OnPaintBackground(PaintEventArgs pevent)
     {
-        // Avoid the native rectangular background pass behind the rounded shape.
     }
 }
 
@@ -511,7 +509,6 @@ public sealed class ThemedComboBox : Control
 
     protected override void OnPaintBackground(PaintEventArgs pevent)
     {
-        // OnPaint clears and draws the entire rounded control without native hover chrome.
     }
 
     protected override void Dispose(bool disposing)
@@ -669,20 +666,15 @@ public sealed class ThemedComboBox : Control
     {
         var centerX = bounds.Left + bounds.Width / 2;
         var centerY = bounds.Top + bounds.Height / 2 + 1;
-        var points = new[]
-        {
-            new Point(centerX - 5, centerY - 2),
-            new Point(centerX, centerY + 3),
-            new Point(centerX + 5, centerY - 2)
-        };
-
         using var pen = new Pen(MutedColor, 2f)
         {
             StartCap = LineCap.Round,
             EndCap = LineCap.Round,
             LineJoin = LineJoin.Round
         };
-        graphics.DrawLines(pen, points);
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        graphics.DrawLine(pen, centerX - 5, centerY - 2, centerX, centerY + 3);
+        graphics.DrawLine(pen, centerX, centerY + 3, centerX + 5, centerY - 2);
     }
 
     public sealed class ThemedComboBoxItemCollection
@@ -998,12 +990,8 @@ public sealed class ThemedCheckBox : CheckBox
                 EndCap = LineCap.Round,
                 LineJoin = LineJoin.Round
             };
-            e.Graphics.DrawLines(pen, new[]
-            {
-                new Point(4, boxY + 8),
-                new Point(7, boxY + 11),
-                new Point(12, boxY + 5)
-            });
+            e.Graphics.DrawLine(pen, 4, boxY + 8, 7, boxY + 11);
+            e.Graphics.DrawLine(pen, 7, boxY + 11, 12, boxY + 5);
         }
 
         var textBounds = new Rectangle(box.Right + 8, 0, Math.Max(0, Width - box.Right - 8), Height);
@@ -1018,7 +1006,6 @@ public sealed class ThemedCheckBox : CheckBox
 
     protected override void OnPaintBackground(PaintEventArgs pevent)
     {
-        // The custom checkbox renderer clears and paints the whole surface.
     }
 }
 
@@ -1118,6 +1105,5 @@ public sealed class ToggleSwitch : Control
 
     protected override void OnPaintBackground(PaintEventArgs pevent)
     {
-        // The switch uses a custom rounded track and clears its own background.
     }
 }

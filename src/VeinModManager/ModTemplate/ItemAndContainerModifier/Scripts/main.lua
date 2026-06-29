@@ -1,4 +1,3 @@
--- main.lua
 local config = require("config")
 
 local patched_vehicles = {}
@@ -165,25 +164,18 @@ local function patch_vehicle_actor(actor, target_weight)
 end
 
 local function patch_vehicles()
+    local found_count = 0
+
     for actor_class_name, target_weight in pairs(config.ContainerWeights) do
         local actors = find_all(actor_class_name)
         if actors then
+            found_count = found_count + #actors
+
             for _, actor in ipairs(actors) do
                 pcall(function()
                     patch_vehicle_actor(actor, target_weight)
                 end)
             end
-        end
-    end
-end
-
-local function count_found_vehicles()
-    local found_count = 0
-
-    for actor_class_name in pairs(config.ContainerWeights) do
-        local actors = find_all(actor_class_name)
-        if actors then
-            found_count = found_count + #actors
         end
     end
 
@@ -231,8 +223,7 @@ local function register_vehicle_scan()
                 return
             end
 
-            local found_count = count_found_vehicles()
-            patch_vehicles()
+            local found_count = patch_vehicles()
 
             log(string.format(
                 "scan @ %ds: found=%d patched=%d",

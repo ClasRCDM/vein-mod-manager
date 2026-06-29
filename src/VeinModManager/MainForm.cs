@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.ComponentModel;
 
 namespace VEIN_Item_And_Container_Modifier;
@@ -23,7 +25,13 @@ public sealed partial class MainForm : Form
     private static readonly Color Red = Color.FromArgb(255, 87, 87);
     private static readonly Color Cyan = Color.FromArgb(18, 223, 213);
     private const int MaxVisibleComboRows = 14;
+    private const int DashboardActivityVisibleHeight = 610;
+    private const int DashboardActivityBottomPadding = 42;
+    private const int MaxLogLines = 500;
     private static readonly string[] BoolChoices = { "Game Default", "True", "False" };
+    private const string SettingsDirectoryName = "VeinModManager";
+    private const string SettingsFileName = "settings.json";
+    private static readonly JsonSerializerOptions SettingsJsonOptions = new() { WriteIndented = true };
 
     private readonly UiConfigState _state = new();
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
@@ -143,6 +151,7 @@ public sealed partial class MainForm : Form
         if (LoadWindowIcon() is { } windowIcon) Icon = windowIcon;
         BuildUi();
 
+        LoadPathSettings();
         AutoDetectPaths(log: true);
         LoadModFromPath();
 
@@ -151,12 +160,25 @@ public sealed partial class MainForm : Form
         UpdateStatuses();
     }
 
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _statusTimer.Stop();
+            _statusTimer.Dispose();
+            _toolTip.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
     private void InitializeComponent()
     {
-        AutoScaleMode = AutoScaleMode.None;
+        AutoScaleDimensions = new SizeF(96F, 96F);
+        AutoScaleMode = AutoScaleMode.Dpi;
         Text = "Vein Mod Manager";
         ClientSize = new Size(1280, 800);
-        MinimumSize = new Size(1180, 720);
+        MinimumSize = new Size(1280, 760);
         FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = true;
         MinimizeBox = true;
@@ -175,6 +197,37 @@ public sealed partial class MainForm : Form
         UseDarkTitleBar(Handle);
     }
 
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!e.Cancel && _hasUnsavedChanges)
+        {
+            var result = MessageBox.Show(
+                this,
+                "You have unsaved config changes. Choose Yes to save, No to discard them, or Cancel to keep editing.",
+                "Save changes before closing?",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button1);
+
+            if (result == DialogResult.Cancel)
+            {
+                e.Cancel = true;
+            }
+            else if (result == DialogResult.Yes && (!TrySaveConfig() || _hasUnsavedChanges))
+            {
+                e.Cancel = true;
+                MessageBox.Show(
+                    this,
+                    "The config could not be saved, so Vein Mod Manager will stay open. Check the log for details.",
+                    "Save failed",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        base.OnFormClosing(e);
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
@@ -191,10 +244,16 @@ public sealed partial class MainForm : Form
         ApplyResponsiveLayout();
     }
 
-    private static bool IsDesignerHosted =>
-        LicenseManager.UsageMode == LicenseUsageMode.Designtime
-        || Process.GetCurrentProcess().ProcessName.Contains("devenv", StringComparison.OrdinalIgnoreCase)
-        || Process.GetCurrentProcess().ProcessName.Contains("DesignToolsServer", StringComparison.OrdinalIgnoreCase);
+    private static readonly bool IsDesignerHosted = DetectDesignerHosted();
+
+    private static bool DetectDesignerHosted()
+    {
+        if (LicenseManager.UsageMode == LicenseUsageMode.Designtime) return true;
+
+        var processName = Path.GetFileNameWithoutExtension(Environment.ProcessPath) ?? "";
+        return processName.Contains("devenv", StringComparison.OrdinalIgnoreCase)
+            || processName.Contains("DesignToolsServer", StringComparison.OrdinalIgnoreCase);
+    }
 
     private void BuildUi()
     {
@@ -239,6 +298,7 @@ public sealed partial class MainForm : Form
                 page.Height = _contentShell.Height;
             }
 
+            ResizeDashboardLayout();
             ResizeServerManagerLayout();
         }
     }
@@ -267,7 +327,7 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        var innerWidth = Math.Max(900, panel.Width - 56);
+        var innerWidth = Math.Max(720, panel.ClientSize.Width - 56);
         if (_serverTypeCombo != null)
         {
             _serverTypeCombo.Width = 310;
@@ -309,6 +369,16 @@ public sealed partial class MainForm : Form
             _linuxServerPanel.Width = Math.Max(930, modeWidth);
             _linuxServerPanel.Height = 300;
         }
+    }
+
+    private void ResizeDashboardLayout()
+    {
+        if (!_tabPages.TryGetValue("Dashboard", out var dashboardPage) || _dashboardActivity is null) return;
+
+        _dashboardActivity.Left = 28;
+        _dashboardActivity.Width = Math.Max(300, dashboardPage.ClientSize.Width - 56);
+        _dashboardActivity.Top = Math.Max(552, dashboardPage.ClientSize.Height - DashboardActivityBottomPadding);
+        _dashboardActivity.Visible = dashboardPage.ClientSize.Height >= DashboardActivityVisibleHeight;
     }
 
     private void DrawDesignerPreview(Graphics graphics)
@@ -514,11 +584,15 @@ public sealed partial class MainForm : Form
             {
                 logoPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Assets", "vein-logo.png");
             }
-            if (File.Exists(logoPath)) logo.Image = Image.FromFile(logoPath);
+            if (File.Exists(logoPath))
+            {
+                using var stream = File.OpenRead(logoPath);
+                using var image = Image.FromStream(stream);
+                logo.Image = new Bitmap(image);
+            }
         }
         catch
         {
-            // Missing logo must not block the editor.
         }
 
         _sidebar.Controls.Add(logo);
@@ -703,6 +777,8 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildDashboardTab()
     {
         var panel = NewPanel(12, 0, 0, 1020, 570);
+        panel.AutoScroll = true;
+        panel.AutoScrollMinSize = new Size(0, 600);
         panel.Controls.Add(MakeLabel("Dashboard", 28, 24, 360, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
         panel.Controls.Add(MakeLabel("Overview, loaded data, config activity, and server status at a glance.", 30, 62, 760, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
 
@@ -727,9 +803,10 @@ public sealed partial class MainForm : Form
         _dashboardActivity = new RichTextBox
         {
             Left = 28,
-            Top = 570,
+            Top = 552,
             Width = 948,
             Height = 28,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
             BackColor = InnerBack,
             ForeColor = TextMuted,
             Font = new Font("Consolas", 9.5F, FontStyle.Regular),
@@ -1134,7 +1211,8 @@ public sealed partial class MainForm : Form
         {
             BackColor = PanelBack,
             AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18)
+            AutoScrollMargin = new Size(0, 18),
+            AutoScrollMinSize = new Size(932, 0)
         };
         _serverModePanel = new Panel
         {
@@ -1156,7 +1234,13 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerManagementPage()
     {
-        var page = new Panel { BackColor = PanelBack };
+        var page = new Panel
+        {
+            BackColor = PanelBack,
+            AutoScroll = true,
+            AutoScrollMargin = new Size(0, 18),
+            AutoScrollMinSize = new Size(932, 0)
+        };
         _serverManagementPane = page;
 
         var windows = NewServerSection("Windows Server Management", 0, 0, 456, 200);
@@ -1185,7 +1269,13 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerBackupsPage()
     {
-        var page = new Panel { BackColor = PanelBack };
+        var page = new Panel
+        {
+            BackColor = PanelBack,
+            AutoScroll = true,
+            AutoScrollMargin = new Size(0, 18),
+            AutoScrollMinSize = new Size(932, 0)
+        };
         _serverBackupsPane = page;
         var section = NewServerSection("Backups", 0, 0, 456, 244);
         page.Controls.Add(section);
@@ -1219,7 +1309,8 @@ public sealed partial class MainForm : Form
         {
             BackColor = PanelBack,
             AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18)
+            AutoScrollMargin = new Size(0, 18),
+            AutoScrollMinSize = new Size(932, 0)
         };
 
         var approved = NewServerSection("Approved Mod List", 0, 0, 456, 286);
@@ -1286,7 +1377,13 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerLogsPage()
     {
-        var page = new Panel { BackColor = PanelBack };
+        var page = new Panel
+        {
+            BackColor = PanelBack,
+            AutoScroll = true,
+            AutoScrollMargin = new Size(0, 18),
+            AutoScrollMinSize = new Size(932, 0)
+        };
         _serverLogsPane = page;
         var section = NewServerSection("Logs", 0, 0, 932, 286);
         section.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -1319,7 +1416,13 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerIntegrationsPage()
     {
-        var page = new Panel { BackColor = PanelBack };
+        var page = new Panel
+        {
+            BackColor = PanelBack,
+            AutoScroll = true,
+            AutoScrollMargin = new Size(0, 18),
+            AutoScrollMinSize = new Size(932, 0)
+        };
         _serverIntegrationsPane = page;
         _linuxHelperPanel = BuildLinuxHelperSection();
         _linuxHelperPanel.Left = 0;
@@ -2441,24 +2544,52 @@ public sealed partial class MainForm : Form
 
     private void AutoDetectPaths(bool log)
     {
+        var savedGameFolder = _gameFolderBox.Text.Trim();
+        var savedModFolder = _modFolderBox.Text.Trim();
+        var hasSavedGameFolder = IsValidGameFolder(savedGameFolder);
+        var hasSavedModFolder = LuaModService.IsValidModFolder(savedModFolder);
+
+        if (hasSavedGameFolder)
+        {
+            var modFolder = hasSavedModFolder
+                ? savedModFolder
+                : LuaModService.DetectModFolder(savedGameFolder) ?? LuaModService.GetExpectedModFolder(savedGameFolder);
+            _gameFolderBox.Text = savedGameFolder;
+            _modFolderBox.Text = modFolder;
+
+            TryInstallBundledMod(savedGameFolder, modFolder, log);
+
+            if (log) Log("Using saved VEIN path: " + savedGameFolder);
+            if (log) Log("Using mod path: " + modFolder);
+            SavePathSettings();
+            LoadModFromPath(loadExistingState: true);
+            UpdateStatuses();
+            return;
+        }
+
         var gameFolder = LuaModService.DetectGameFolder();
         if (!string.IsNullOrWhiteSpace(gameFolder))
         {
             _gameFolderBox.Text = gameFolder;
-            var modFolder = LuaModService.DetectModFolder(gameFolder) ?? LuaModService.GetExpectedModFolder(gameFolder);
+            var modFolder = hasSavedModFolder
+                ? savedModFolder
+                : LuaModService.DetectModFolder(gameFolder) ?? LuaModService.GetExpectedModFolder(gameFolder);
             _modFolderBox.Text = modFolder;
 
             TryInstallBundledMod(gameFolder, modFolder, log);
 
             if (log) Log("Detected VEIN path: " + gameFolder);
-            if (log) Log("Detected mod path: " + modFolder);
+            if (log) Log("Using mod path: " + modFolder);
             LoadModFromPath(loadExistingState: true);
         }
         else if (log)
         {
-            Log("VEIN path was not auto-detected. Use Browse.");
+            Log(hasSavedModFolder
+                ? "VEIN path was not auto-detected. Keeping the saved mod folder."
+                : "VEIN path was not auto-detected. Use Browse.");
         }
 
+        SavePathSettings();
         UpdateStatuses();
     }
 
@@ -2470,6 +2601,7 @@ public sealed partial class MainForm : Form
         var expected = LuaModService.DetectModFolder(dlg.SelectedPath) ?? LuaModService.GetExpectedModFolder(dlg.SelectedPath);
         _modFolderBox.Text = expected;
         TryInstallBundledMod(dlg.SelectedPath, expected, log: true);
+        SavePathSettings();
         LoadModFromPath(loadExistingState: true);
         MarkUnsaved(false);
         Log("Selected VEIN path: " + dlg.SelectedPath);
@@ -2497,12 +2629,102 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private void LoadPathSettings()
+    {
+        var path = GetLocalSettingsPath();
+        if (path == null || !File.Exists(path)) return;
+
+        try
+        {
+            var settings = JsonSerializer.Deserialize<LocalPathSettings>(File.ReadAllText(path));
+            if (settings == null) return;
+
+            var gameFolder = settings.GameFolder;
+            if (!string.IsNullOrWhiteSpace(gameFolder) && IsValidGameFolder(gameFolder))
+            {
+                _gameFolderBox.Text = gameFolder;
+            }
+
+            var modFolder = settings.ModFolder;
+            if (!string.IsNullOrWhiteSpace(modFolder) && LuaModService.IsValidModFolder(modFolder))
+            {
+                _modFolderBox.Text = modFolder;
+            }
+        }
+        catch (Exception ex)
+        {
+            LogError("Saved path settings could not be loaded. Auto Detect will be used instead. " + ex.Message);
+        }
+    }
+
+    private void SavePathSettings()
+    {
+        var path = GetLocalSettingsPath();
+        if (path == null) return;
+
+        try
+        {
+            var settings = new LocalPathSettings
+            {
+                GameFolder = _gameFolderBox.Text.Trim(),
+                ModFolder = _modFolderBox.Text.Trim()
+            };
+            WriteTextAtomic(path, JsonSerializer.Serialize(settings, SettingsJsonOptions));
+        }
+        catch (Exception ex)
+        {
+            LogError("Path settings could not be saved, but the app can continue. " + ex.Message);
+        }
+    }
+
+    private static string? GetLocalSettingsPath()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return string.IsNullOrWhiteSpace(localAppData)
+            ? null
+            : Path.Combine(localAppData, SettingsDirectoryName, SettingsFileName);
+    }
+
+    private static void WriteTextAtomic(string path, string content)
+    {
+        var directory = Path.GetDirectoryName(path) ?? ".";
+        Directory.CreateDirectory(directory);
+        var tempPath = Path.Combine(directory, Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+
+        try
+        {
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+            {
+                writer.Write(content);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(path)) File.Replace(tempPath, path, null);
+            else File.Move(tempPath, path);
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
+
+    private static bool IsValidGameFolder(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return false;
+        return File.Exists(Path.Combine(path, "Vein", "Binaries", "Win64", "Vein-Win64-Test.exe"))
+            || File.Exists(Path.Combine(path, "Vein", "Binaries", "Win64", "Vein.exe"))
+            || Directory.Exists(Path.Combine(path, "Vein", "Content", "Paks"));
+    }
+
     private void BrowseModFolder()
     {
         using var dlg = new FolderBrowserDialog { Description = "Select ItemAndContainerModifier folder" };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
         _modFolderBox.Text = dlg.SelectedPath;
         LoadModFromPath(loadExistingState: true);
+        SavePathSettings();
         Log("Selected mod folder: " + dlg.SelectedPath);
     }
 
@@ -2511,8 +2733,15 @@ public sealed partial class MainForm : Form
         var path = _modFolderBox.Text.Trim();
         if (Directory.Exists(path))
         {
-            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
-            Log("Opened mod folder.");
+            try
+            {
+                using var process = Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+                Log("Opened mod folder.");
+            }
+            catch (Exception ex)
+            {
+                LogError("Could not open mod folder: " + ex.Message);
+            }
         }
         else
         {
@@ -2554,6 +2783,7 @@ public sealed partial class MainForm : Form
             Log(markUnsaved
                 ? $"Imported {editCount} generated edits into the editor."
                 : $"Loaded {editCount} generated edits from the current mod folder.");
+            SavePathSettings();
             return true;
         }
         catch (Exception ex)
@@ -2596,6 +2826,7 @@ public sealed partial class MainForm : Form
             Log("Backup created: " + install.BackupPath);
             Log("Installed ui_config.lua to: " + install.InstalledPath);
             LoadModFromPath(loadExistingState: true);
+            SavePathSettings();
         }
         catch (Exception ex)
         {
@@ -2642,8 +2873,15 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        Process.Start(new ProcessStartInfo { FileName = scripts, UseShellExecute = true });
-        Log("Opened config folder.");
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo { FileName = scripts, UseShellExecute = true });
+            Log("Opened config folder.");
+        }
+        catch (Exception ex)
+        {
+            LogError("Could not open config folder: " + ex.Message);
+        }
     }
 
     private void ConfigImport_DragEnter(object? sender, DragEventArgs e)
@@ -2747,12 +2985,33 @@ public sealed partial class MainForm : Form
 
     private void SaveConfig()
     {
+        _ = TrySaveConfig();
+    }
+
+    private bool TrySaveConfig()
+    {
         LoadModFromPath(loadExistingState: false);
         var modFolder = _modFolderBox.Text.Trim();
         if (!LuaModService.IsValidModFolder(modFolder))
         {
-            LogError("Cannot save. Select the ItemAndContainerModifier folder first.");
-            return;
+            LogError("Cannot save. Select a valid ItemAndContainerModifier folder first.");
+            return false;
+        }
+
+        if (IsGameRunning())
+        {
+            var result = MessageBox.Show(
+                this,
+                "VEIN appears to be running. Save anyway, then restart the game for changes to apply?",
+                "VEIN is running",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+            if (result != DialogResult.Yes)
+            {
+                Log("Save canceled because VEIN is running.");
+                return false;
+            }
         }
 
         try
@@ -2763,12 +3022,15 @@ public sealed partial class MainForm : Form
             LuaModService.ApplyConfig(modFolder, _state);
             _lastConfigSaveAt = DateTime.Now;
             MarkUnsaved(false);
+            SavePathSettings();
             Log("Config saved. Restart VEIN if the game is open.");
             LoadModFromPath(loadExistingState: true);
+            return !_hasUnsavedChanges;
         }
         catch (Exception ex)
         {
-            LogError("Save failed: " + ex.Message);
+            LogError("Save failed. Your unsaved changes are still open in the editor. " + ex.Message);
+            return false;
         }
     }
 
@@ -2797,7 +3059,7 @@ public sealed partial class MainForm : Form
     {
         try
         {
-            var process = LuaModService.LaunchVein(_gameFolderBox.Text.Trim());
+            using var process = LuaModService.LaunchVein(_gameFolderBox.Text.Trim());
             Log(process == null ? "VEIN executable was not found." : "Launched VEIN.");
         }
         catch (Exception ex)
@@ -2812,12 +3074,14 @@ public sealed partial class MainForm : Form
         if (category == null) return;
 
         var values = new Dictionary<string, LuaValue>(StringComparer.OrdinalIgnoreCase);
-        AddCategoryNumber(values, "Weight");
-        AddCategoryNumber(values, "MaxStack", allowNegative: false);
+        var inputsValid = true;
+        inputsValid &= AddCategoryNumber(values, "Weight");
+        inputsValid &= AddCategoryNumber(values, "MaxStack", allowNegative: false);
         AddCategoryBool(values, "bStackable");
-        AddCategoryNumber(values, "MaxWeight");
-        AddCategoryNumber(values, "ExtraWeightCapacity");
-        AddCategoryNumber(values, "RunSpeedMultiplier");
+        inputsValid &= AddCategoryNumber(values, "MaxWeight");
+        inputsValid &= AddCategoryNumber(values, "ExtraWeightCapacity");
+        inputsValid &= AddCategoryNumber(values, "RunSpeedMultiplier");
+        if (!inputsValid) return;
 
         _state.EnabledCategories[category] = _categoryEnabled.Checked;
         if (values.Count == 0) _state.CategoryDefaults.Remove(category);
@@ -2859,19 +3123,22 @@ public sealed partial class MainForm : Form
             {
                 if (_state.ContainerWeightOverrides.TryGetValue(item.Category, out var existing)) existing.Remove(item.ClassName);
             }
-            else if (ReadItemNumber("MaxWeight", "Max Weight", out var maxWeight))
+            else
             {
-                GetContainerOverrides(item.Category)[item.ClassName] = maxWeight;
+                if (!ReadItemNumber("MaxWeight", "Max Weight", out var maxWeight, out var hasMaxWeight)) return;
+                if (hasMaxWeight) GetContainerOverrides(item.Category)[item.ClassName] = maxWeight;
             }
         }
         else
         {
             var values = new Dictionary<string, LuaValue>(StringComparer.OrdinalIgnoreCase);
-            AddItemNumber(values, "Weight", "Weight");
-            AddItemNumber(values, "MaxStack", "Max Stack", allowNegative: false);
+            var inputsValid = true;
+            inputsValid &= AddItemNumber(values, "Weight", "Weight");
+            inputsValid &= AddItemNumber(values, "MaxStack", "Max Stack", allowNegative: false);
             AddItemBool(values, "bStackable");
-            AddItemNumber(values, "ExtraWeightCapacity", "Extra Weight Capacity");
-            AddItemNumber(values, "RunSpeedMultiplier", "Run Speed Multiplier");
+            inputsValid &= AddItemNumber(values, "ExtraWeightCapacity", "Extra Weight Capacity");
+            inputsValid &= AddItemNumber(values, "RunSpeedMultiplier", "Run Speed Multiplier");
+            if (!inputsValid) return;
 
             if (values.Count == 0)
             {
@@ -2909,11 +3176,31 @@ public sealed partial class MainForm : Form
         UpdateStatuses();
     }
 
+    private void ClearDynamicFieldControls(Control parent)
+    {
+        foreach (Control control in parent.Controls.Cast<Control>().ToArray())
+        {
+            ClearToolTipTree(control);
+            control.Dispose();
+        }
+
+        parent.Controls.Clear();
+    }
+
+    private void ClearToolTipTree(Control control)
+    {
+        _toolTip.SetToolTip(control, null);
+        foreach (Control child in control.Controls)
+        {
+            ClearToolTipTree(child);
+        }
+    }
+
     private void RefreshCategoryEditor()
     {
         if (_categoryCombo == null || _categoryFields == null) return;
         var category = CurrentCategory();
-        _categoryFields.Controls.Clear();
+        ClearDynamicFieldControls(_categoryFields);
         _categoryInputs.Clear();
 
         if (string.IsNullOrWhiteSpace(category))
@@ -2977,7 +3264,7 @@ public sealed partial class MainForm : Form
         try
         {
             var item = CurrentItem();
-            _itemFields.Controls.Clear();
+            ClearDynamicFieldControls(_itemFields);
             _itemInputs.Clear();
 
             if (item == null)
@@ -3085,11 +3372,38 @@ public sealed partial class MainForm : Form
         UpdateStatuses();
     }
 
+    private static bool IsGameRunning()
+    {
+        return IsAnyProcessRunning(
+            "Vein-Win64-Test",
+            "Vein",
+            "Vein-Win64-Shipping");
+    }
+
+    private static bool IsAnyProcessRunning(params string[] processNames)
+    {
+        foreach (var processName in processNames)
+        {
+            var processes = Process.GetProcessesByName(processName);
+            try
+            {
+                if (processes.Length > 0) return true;
+            }
+            finally
+            {
+                foreach (var process in processes)
+                {
+                    process.Dispose();
+                }
+            }
+        }
+
+        return false;
+    }
+
     private void UpdateStatuses()
     {
-        var gameRunning = Process.GetProcessesByName("Vein-Win64-Test").Length > 0
-            || Process.GetProcessesByName("Vein").Length > 0
-            || Process.GetProcessesByName("Vein-Win64-Shipping").Length > 0;
+        var gameRunning = IsGameRunning();
         _gameStatus.Text = gameRunning ? "Open" : "Closed";
         _gameStatus.ForeColor = gameRunning ? Green : Orange;
 
@@ -3227,8 +3541,8 @@ public sealed partial class MainForm : Form
         var field = NewFieldPanel(label, 250, 96);
         field.Margin = new Padding(0, 0, 18, 10);
         Control input = kind == FieldKind.Bool
-            ? NewCombo(20, 48, 210, BoolChoices)
-            : NewTextBox(20, 50, 210, 34);
+            ? NewCombo(14, 40, 220, BoolChoices)
+            : NewNumberTextBox(14, 40, 220, 36);
         AddTip(input, kind == FieldKind.Bool
             ? $"Choose a category-wide default for {label}, or leave Game Default."
             : $"Enter a category-wide number for {label}, or leave blank for game default.");
@@ -3248,8 +3562,8 @@ public sealed partial class MainForm : Form
         check.BackColor = InnerBack;
         AddTip(check, "Leave checked to keep the game's value. Uncheck to type a generated override.");
         Control input = kind == FieldKind.Bool
-            ? NewCombo(25, 68, 200, BoolChoices)
-            : NewTextBox(25, 70, 200, 34);
+            ? NewCombo(25, 64, 220, BoolChoices)
+            : NewNumberTextBox(25, 68, 220, 28);
         AddTip(input, kind == FieldKind.Bool
             ? $"Choose an override for {label}, or keep Game Default."
             : $"Type the {label} override for this one item.");
@@ -3275,10 +3589,12 @@ public sealed partial class MainForm : Form
         field.Height = editMode ? 112 : 82;
     }
 
-    private void AddCategoryNumber(Dictionary<string, LuaValue> values, string key, bool allowNegative = true)
+    private bool AddCategoryNumber(Dictionary<string, LuaValue> values, string key, bool allowNegative = true)
     {
-        if (!_categoryInputs.TryGetValue(key, out var input) || input is not TextBox box) return;
-        if (TryReadOptionalNumber(box.Text, key, out var value, allowNegative)) values[key] = value;
+        if (!_categoryInputs.TryGetValue(key, out var input) || input is not TextBox box) return true;
+        if (!TryReadOptionalNumber(box.Text, key, out var value, out var hasValue, allowNegative)) return false;
+        if (hasValue) values[key] = value;
+        return true;
     }
 
     private void AddCategoryBool(Dictionary<string, LuaValue> values, string key)
@@ -3288,9 +3604,11 @@ public sealed partial class MainForm : Form
         if (!value.IsNil) values[key] = value;
     }
 
-    private void AddItemNumber(Dictionary<string, LuaValue> values, string key, string label, bool allowNegative = true)
+    private bool AddItemNumber(Dictionary<string, LuaValue> values, string key, string label, bool allowNegative = true)
     {
-        if (ReadItemNumber(key, label, out var value, allowNegative)) values[key] = value;
+        if (!ReadItemNumber(key, label, out var value, out var hasValue, allowNegative)) return false;
+        if (hasValue) values[key] = value;
+        return true;
     }
 
     private void AddItemBool(Dictionary<string, LuaValue> values, string key)
@@ -3300,18 +3618,28 @@ public sealed partial class MainForm : Form
         if (!value.IsNil) values[key] = value;
     }
 
-    private bool ReadItemNumber(string key, string label, out LuaValue value, bool allowNegative = true)
+    private bool ReadItemNumber(string key, string label, out LuaValue value, out bool hasValue, bool allowNegative = true)
     {
         value = LuaValue.Nil;
-        if (!_itemInputs.TryGetValue(key, out var field) || field.DefaultCheck.Checked || field.Input is not TextBox box) return false;
-        return TryReadOptionalNumber(box.Text, label, out value, allowNegative);
+        hasValue = false;
+        if (!_itemInputs.TryGetValue(key, out var field) || field.DefaultCheck.Checked || field.Input is not TextBox box) return true;
+
+        var raw = box.Text.Trim();
+        if (string.IsNullOrWhiteSpace(raw) || raw.Equals("nil", StringComparison.OrdinalIgnoreCase))
+        {
+            LogError(label + " must be a number or check Use Game Default.");
+            return false;
+        }
+
+        return TryReadOptionalNumber(raw, label, out value, out hasValue, allowNegative);
     }
 
-    private bool TryReadOptionalNumber(string raw, string label, out LuaValue value, bool allowNegative = true)
+    private bool TryReadOptionalNumber(string raw, string label, out LuaValue value, out bool hasValue, bool allowNegative = true)
     {
         value = LuaValue.Nil;
+        hasValue = false;
         raw = raw.Trim();
-        if (string.IsNullOrWhiteSpace(raw) || raw.Equals("nil", StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.IsNullOrWhiteSpace(raw) || raw.Equals("nil", StringComparison.OrdinalIgnoreCase)) return true;
 
         if (!decimal.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
         {
@@ -3327,6 +3655,7 @@ public sealed partial class MainForm : Form
 
         if (number >= 999999) Log(label + " is massive. Allowed for private testing.");
         value = new LuaValue(number);
+        hasValue = true;
         return true;
     }
 
@@ -3400,11 +3729,14 @@ public sealed partial class MainForm : Form
 
     private void AppendLog(string msg, Color color)
     {
+        msg = RedactUserProfile(msg);
         var line = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " | " + msg + Environment.NewLine;
         _log.SelectionStart = _log.TextLength;
         _log.SelectionColor = color;
         _log.AppendText(line);
         _log.SelectionColor = _log.ForeColor;
+        TrimLog();
+        _log.SelectionStart = _log.TextLength;
         _log.ScrollToCaret();
         TrackRecentActivity(line.TrimEnd());
     }
@@ -3420,9 +3752,33 @@ public sealed partial class MainForm : Form
         RefreshDashboard();
     }
 
+    private void TrimLog()
+    {
+        var lineCount = _log.Lines.Length;
+        if (lineCount <= MaxLogLines) return;
+
+        var firstCharToKeep = _log.GetFirstCharIndexFromLine(lineCount - MaxLogLines);
+        if (firstCharToKeep <= 0) return;
+
+        _log.Select(0, firstCharToKeep);
+        _log.SelectedText = "";
+    }
+
+    private static string RedactUserProfile(string text)
+    {
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return string.IsNullOrWhiteSpace(profile)
+            ? text
+            : text.Replace(profile, "~", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static RoundedPanel NewContentPanel()
     {
-        return NewPanel(12, 0, 0, 1020, 512);
+        var panel = NewPanel(12, 0, 0, 1020, 512);
+        panel.AutoScroll = true;
+        panel.AutoScrollMargin = new Size(0, 16);
+        panel.AutoScrollMinSize = new Size(0, 512);
+        return panel;
     }
 
     private static FlowLayoutPanel NewFieldFlow(int x, int y, int w, int h)
@@ -3536,6 +3892,13 @@ public sealed partial class MainForm : Form
             box.UseSystemPasswordChar = true;
         }
 
+        return box;
+    }
+
+    private static ThemedTextBox NewNumberTextBox(int x, int y, int w, int h)
+    {
+        var box = NewTextBox(x, y, w, h);
+        box.TextAlign = HorizontalAlignment.Center;
         return box;
     }
 
@@ -3761,6 +4124,12 @@ public sealed partial class MainForm : Form
     private static readonly Regex AcronymBoundaryPattern = new(@"(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.Compiled);
     private static readonly Regex NumberBoundaryPattern = new(@"(?<=\D)(?=\d)", RegexOptions.Compiled);
     private static readonly Regex WhitespacePattern = new(@"\s+", RegexOptions.Compiled);
+
+    private sealed class LocalPathSettings
+    {
+        public string? GameFolder { get; set; }
+        public string? ModFolder { get; set; }
+    }
 
     private enum FieldKind
     {

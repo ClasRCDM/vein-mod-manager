@@ -1,10 +1,9 @@
-﻿-- backpacks.lua
 return {
 		["BP_BackpackSchool_C"] = {
 			Weight      = nil,
 			MaxStack    = 1,
-			bStackable  = false,         -- true/false
-            ExtraWeightCapacity = nil,  
+			bStackable  = false,
+            ExtraWeightCapacity = nil,
             RunSpeedMultiplier  = nil,
             _CDOPath = "/Game/Vein/Items/Clothing/08_Back/BP_BackpackSchool.Default__BP_BackpackSchool_C",
         },
@@ -24,7 +23,7 @@ return {
             RunSpeedMultiplier  = nil,
             _CDOPath = "/Game/Vein/Items/Clothing/08_Back/BP_BackpackMilitary.Default__BP_BackpackMilitary_C",
         },
-		["BP_BackpacGolf_C"] = {
+		["BP_BackpackGolf_C"] = {
 			Weight      = nil,
 			MaxStack    = 1,
 			bStackable  = false,

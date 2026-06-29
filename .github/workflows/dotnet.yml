@@ -13,8 +13,10 @@ on:
       - dev
       - staging
 
+  workflow_dispatch:
+
 jobs:
-  build:
+  ci:
     runs-on: windows-latest
 
     steps:
@@ -27,10 +29,41 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore VeinModManager.sln
 
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build VeinModManager.sln --configuration Release --no-restore
 
-      - name: Smoke test
-        run: dotnet run --project tests\VeinModManager.SmokeTests\VeinModManager.SmokeTests.csproj -- src\VeinModManager\ModTemplate\ItemAndContainerModifier
+      - name: Test
+        run: dotnet run --project tests\VeinModManager.SmokeTests\VeinModManager.SmokeTests.csproj --configuration Release --no-build -- src\VeinModManager\ModTemplate\ItemAndContainerModifier
+
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    needs: ci
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish win-x64
+        run: dotnet publish src\VeinModManager\VeinModManager.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts\VeinModManager-win-x64
+
+      - name: Package win-x64
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts\VeinModManager-win-x64\* -DestinationPath artifacts\VeinModManager-win-x64.zip -Force
+          (Get-FileHash artifacts\VeinModManager-win-x64.zip -Algorithm SHA256).Hash | Set-Content artifacts\VeinModManager-win-x64.zip.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeinModManager-win-x64
+          path: |
+            artifacts\VeinModManager-win-x64.zip
+            artifacts\VeinModManager-win-x64.zip.sha256

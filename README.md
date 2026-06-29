@@ -20,37 +20,35 @@ It helps users edit item, backpack, vehicle, and container values without manual
 src/VeinModManager/              Windows Forms app
 tests/VeinModManager.SmokeTests/ Smoke tests for config save/load paths
 docs/                            Branching, release, and security notes
-.github/workflows/               Build and smoke-test workflow
+.github/workflows/               Build, test, and release workflow
 ```
 
-## Build
+## Build and Test
 
 Requirements:
 
 - Windows
 - .NET 8 SDK
 
-```powershell
-dotnet restore
-dotnet build
-```
-
-## Smoke Test
+Use the conventional solution file for local development and CI:
 
 ```powershell
-dotnet run --project tests\VeinModManager.SmokeTests\VeinModManager.SmokeTests.csproj -- src\VeinModManager\ModTemplate\ItemAndContainerModifier
+dotnet restore VeinModManager.sln
+dotnet build VeinModManager.sln --configuration Release --no-restore
+dotnet test VeinModManager.sln --configuration Release --no-build --verbosity normal
 ```
 
 ## Publish
 
 ```powershell
-dotnet publish src\VeinModManager\VeinModManager.csproj -c Release -r win-x64 --self-contained true
+dotnet publish src\VeinModManager\VeinModManager.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts\VeinModManager-win-x64
 ```
 
-The published app is written to:
+The release workflow packages:
 
 ```text
-src/VeinModManager/bin/Release/net8.0-windows/win-x64/publish/
+artifacts\VeinModManager-win-x64.zip
+artifacts\VeinModManager-win-x64.zip.sha256
 ```
 
 ## Branch Flow

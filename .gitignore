@@ -11,6 +11,7 @@ bin/
 obj/
 publish/
 artifacts/
+graphify-out/
 TestResults/
 
 # IDE/user state

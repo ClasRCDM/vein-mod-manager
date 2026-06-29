@@ -148,14 +148,14 @@ public static partial class LuaModService
         var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var root in CommonSteamRootCandidates())
         {
-            if (Directory.Exists(root)) roots.Add(Path.GetFullPath(root));
+            if (TryGetFullExistingDirectory(root, out var fullRoot)) roots.Add(fullRoot);
         }
 
         foreach (var root in roots.ToArray())
         {
             foreach (var library in ReadSteamLibraryFolders(root))
             {
-                if (Directory.Exists(library)) roots.Add(Path.GetFullPath(library));
+                if (TryGetFullExistingDirectory(library, out var fullLibrary)) roots.Add(fullLibrary);
             }
         }
 
@@ -173,7 +173,7 @@ public static partial class LuaModService
         var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
         if (!string.IsNullOrWhiteSpace(programFiles)) yield return Path.Combine(programFiles, "Steam");
 
-        foreach (var drive in DriveInfo.GetDrives().Where(drive => drive.IsReady && drive.DriveType == DriveType.Fixed))
+        foreach (var drive in ReadyFixedDrives())
         {
             yield return Path.Combine(drive.RootDirectory.FullName, "SteamLibrary");
             yield return Path.Combine(drive.RootDirectory.FullName, "Steam");
@@ -185,7 +185,7 @@ public static partial class LuaModService
         yield return @"C:\Program Files (x86)\Steam\steamapps\common\Vein";
         yield return @"C:\Program Files\Steam\steamapps\common\Vein";
 
-        foreach (var drive in DriveInfo.GetDrives().Where(drive => drive.IsReady && drive.DriveType == DriveType.Fixed))
+        foreach (var drive in ReadyFixedDrives())
         {
             yield return Path.Combine(drive.RootDirectory.FullName, "SteamLibrary", "steamapps", "common", "Vein");
             yield return Path.Combine(drive.RootDirectory.FullName, "Steam", "steamapps", "common", "Vein");
@@ -194,9 +194,16 @@ public static partial class LuaModService
 
     private static string? ReadSteamInstallPath()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
-        var steamPath = Convert.ToString(key?.GetValue("SteamPath") ?? key?.GetValue("InstallPath"));
-        return string.IsNullOrWhiteSpace(steamPath) ? null : steamPath.Replace('/', Path.DirectorySeparatorChar);
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+            var steamPath = Convert.ToString(key?.GetValue("SteamPath") ?? key?.GetValue("InstallPath"));
+            return string.IsNullOrWhiteSpace(steamPath) ? null : steamPath.Replace('/', Path.DirectorySeparatorChar);
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex) || ex is System.Security.SecurityException)
+        {
+            return null;
+        }
     }
 
     private static IEnumerable<string> ReadSteamLibraryFolders(string steamRoot)
@@ -204,7 +211,17 @@ public static partial class LuaModService
         var libraryFoldersPath = Path.Combine(steamRoot, "steamapps", "libraryfolders.vdf");
         if (!File.Exists(libraryFoldersPath)) yield break;
 
-        foreach (Match match in SteamLibraryPathPattern.Matches(File.ReadAllText(libraryFoldersPath, Encoding.UTF8)))
+        string text;
+        try
+        {
+            text = File.ReadAllText(libraryFoldersPath, Encoding.UTF8);
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            yield break;
+        }
+
+        foreach (Match match in SteamLibraryPathPattern.Matches(text))
         {
             var path = Regex.Unescape(match.Groups["path"].Value).Replace(@"\\", @"\");
             if (!string.IsNullOrWhiteSpace(path)) yield return path;
@@ -213,8 +230,66 @@ public static partial class LuaModService
 
     private static string? ReadSteamManifestValue(string manifestPath, string key)
     {
-        var match = Regex.Match(File.ReadAllText(manifestPath, Encoding.UTF8), $@"""{Regex.Escape(key)}""\s+""(?<value>[^""]+)""", RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups["value"].Value : null;
+        try
+        {
+            var match = Regex.Match(File.ReadAllText(manifestPath, Encoding.UTF8), $@"""{Regex.Escape(key)}""\s+""(?<value>[^""]+)""", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups["value"].Value : null;
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            return null;
+        }
+    }
+
+    private static IEnumerable<DriveInfo> ReadyFixedDrives()
+    {
+        DriveInfo[] drives;
+        try
+        {
+            drives = DriveInfo.GetDrives();
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            yield break;
+        }
+
+        foreach (var drive in drives)
+        {
+            bool ready;
+            try
+            {
+                ready = drive.IsReady && drive.DriveType == DriveType.Fixed;
+            }
+            catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+            {
+                continue;
+            }
+
+            if (ready) yield return drive;
+        }
+    }
+
+    private static bool TryGetFullExistingDirectory(string path, out string fullPath)
+    {
+        fullPath = "";
+        try
+        {
+            if (!Directory.Exists(path)) return false;
+            fullPath = Path.GetFullPath(path);
+            return true;
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            return false;
+        }
+    }
+
+    private static bool IsRecoverableFileSystemException(Exception ex)
+    {
+        return ex is IOException
+            || ex is UnauthorizedAccessException
+            || ex is ArgumentException
+            || ex is NotSupportedException;
     }
 
     private static string? GetBundledModTemplateFolder()
@@ -288,7 +363,7 @@ public static partial class LuaModService
     public static string CreateBackup(string modFolder)
     {
         var scripts = Path.Combine(modFolder, "Scripts");
-        var backupRoot = Path.Combine(modFolder, "Backups", DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture));
+        var backupRoot = CreateUniqueBackupFolder(modFolder);
         Directory.CreateDirectory(backupRoot);
 
         CopyIfExists(Path.Combine(scripts, "config.lua"), Path.Combine(backupRoot, "config.lua"));
@@ -312,8 +387,9 @@ public static partial class LuaModService
     {
         var scripts = Path.Combine(modFolder, "Scripts");
         Directory.CreateDirectory(scripts);
+        var uiConfigPath = Path.Combine(scripts, "ui_config.lua");
         EnsureConfigPatched(Path.Combine(scripts, "config.lua"));
-        WriteUiConfigAtomic(Path.Combine(scripts, "ui_config.lua"), state);
+        WriteUiConfigAtomic(uiConfigPath, state);
         EnsureModEnabled(modFolder);
     }
 
@@ -351,7 +427,7 @@ public static partial class LuaModService
         var state = new UiConfigState();
         if (!File.Exists(uiConfigPath)) return state;
 
-        var root = LuaTableParser.ParseUiConfig(File.ReadAllText(uiConfigPath, Encoding.UTF8));
+        var root = ReadUiConfigRoot(uiConfigPath);
         ReadEnabledCategories(root, state);
         ReadCategoryDefaults(root, state);
         ReadItemOverrides(root, state);
@@ -366,7 +442,7 @@ public static partial class LuaModService
         var text = File.ReadAllText(configPath, Encoding.UTF8);
         if (text.Contains(PatchMarker, StringComparison.Ordinal)) return;
 
-        var backup = configPath + ".codex-backup-before-ui-config-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        var backup = CreateUniqueSiblingPath(configPath, ".codex-backup-before-ui-config-");
         File.Copy(configPath, backup, overwrite: false);
 
         text = ReplaceOnce(
@@ -427,24 +503,42 @@ public static partial class LuaModService
         var directory = Path.GetDirectoryName(uiConfigPath) ?? ".";
         Directory.CreateDirectory(directory);
 
+
         if (File.Exists(uiConfigPath))
         {
-            var backup = uiConfigPath + ".codex-backup-before-apply-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            var backup = CreateUniqueSiblingPath(uiConfigPath, ".codex-backup-before-apply-");
             File.Copy(uiConfigPath, backup, overwrite: false);
         }
 
-        var tempPath = uiConfigPath + ".tmp";
-        File.WriteAllText(tempPath, lua, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        File.Copy(tempPath, uiConfigPath, overwrite: true);
-        File.Delete(tempPath);
+        var tempPath = Path.Combine(directory, Path.GetFileName(uiConfigPath) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+            {
+                writer.Write(lua);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(uiConfigPath))
+            {
+                File.Replace(tempPath, uiConfigPath, null);
+            }
+            else
+            {
+                File.Move(tempPath, uiConfigPath);
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
     }
 
     public static string GenerateUiConfigLua(UiConfigState state)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("-- ui_config.lua");
-        sb.AppendLine("-- Generated by Vein Mod Manager.");
-        sb.AppendLine("-- Edit with the desktop app instead of changing this file by hand.");
         sb.AppendLine("local UiConfig = {");
         WriteEnabledCategories(sb, state);
         WriteCategoryDefaults(sb, state);
@@ -760,6 +854,58 @@ public static partial class LuaModService
         }
     }
 
+
+    private static Dictionary<string, object?> ReadUiConfigRoot(string uiConfigPath)
+    {
+        try
+        {
+            return LuaTableParser.ParseUiConfig(File.ReadAllText(uiConfigPath, Encoding.UTF8));
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new InvalidDataException("Invalid ui_config.lua at '" + uiConfigPath + "': " + ex.Message, ex);
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidDataException("Could not parse ui_config.lua at '" + uiConfigPath + "': " + ex.Message, ex);
+        }
+        catch (OverflowException ex)
+        {
+            throw new InvalidDataException("Could not parse ui_config.lua at '" + uiConfigPath + "': " + ex.Message, ex);
+        }
+    }
+
+    private static string CreateUniqueBackupFolder(string modFolder)
+    {
+        var backupParent = Path.Combine(modFolder, "Backups");
+        Directory.CreateDirectory(backupParent);
+
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff", CultureInfo.InvariantCulture);
+        var backupRoot = Path.Combine(backupParent, timestamp);
+        if (!Directory.Exists(backupRoot)) return backupRoot;
+
+        for (var index = 1; ; index++)
+        {
+            var candidate = Path.Combine(backupParent, timestamp + "-" + index.ToString(CultureInfo.InvariantCulture));
+            if (!Directory.Exists(candidate)) return candidate;
+        }
+    }
+
+    private static string CreateUniqueSiblingPath(string path, string suffix)
+    {
+        var directory = Path.GetDirectoryName(path) ?? ".";
+        var fileName = Path.GetFileName(path);
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
+        var candidate = Path.Combine(directory, fileName + suffix + timestamp);
+        if (!File.Exists(candidate) && !Directory.Exists(candidate)) return candidate;
+
+        for (var index = 1; ; index++)
+        {
+            var numbered = Path.Combine(directory, fileName + suffix + timestamp + "-" + index.ToString(CultureInfo.InvariantCulture));
+            if (!File.Exists(numbered) && !Directory.Exists(numbered)) return numbered;
+        }
+    }
+
     private static void CopyIfExists(string source, string destination)
     {
         if (File.Exists(source)) File.Copy(source, destination, overwrite: true);
@@ -812,12 +958,24 @@ public static partial class LuaModService
         public static Dictionary<string, object?> ParseUiConfig(string text)
         {
             var parser = new LuaTableParser(text);
+            var returnMatch = ReturnUiConfigPattern.Match(parser._text);
+            if (!returnMatch.Success)
+            {
+                throw new InvalidDataException("ui_config.lua is missing 'return UiConfig'. Add it after the UiConfig table.");
+            }
+
             var marker = parser._text.IndexOf("local UiConfig", StringComparison.Ordinal);
-            if (marker < 0) marker = parser._text.IndexOf("UiConfig", StringComparison.Ordinal);
-            if (marker < 0) return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            if (marker < 0 || marker > returnMatch.Index) marker = parser._text.IndexOf("UiConfig", StringComparison.Ordinal);
+            if (marker < 0 || marker > returnMatch.Index)
+            {
+                throw new InvalidDataException("ui_config.lua is missing a UiConfig table before 'return UiConfig'.");
+            }
 
             var tableStart = parser._text.IndexOf('{', marker);
-            if (tableStart < 0) return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            if (tableStart < 0 || tableStart > returnMatch.Index)
+            {
+                throw new InvalidDataException("ui_config.lua is missing the opening '{' for the UiConfig table.");
+            }
 
             parser._index = tableStart;
             return parser.ParseTable();
@@ -896,7 +1054,18 @@ public static partial class LuaModService
             }
 
             var raw = _text[start.._index];
-            return decimal.Parse(raw, NumberStyles.Float, CultureInfo.InvariantCulture);
+            try
+            {
+                return decimal.Parse(raw, NumberStyles.Float, CultureInfo.InvariantCulture);
+            }
+            catch (FormatException ex)
+            {
+                throw CreateFormatException("Invalid Lua number '" + raw + "'.", ex);
+            }
+            catch (OverflowException ex)
+            {
+                throw CreateFormatException("Lua number '" + raw + "' is outside the supported range.", ex);
+            }
         }
 
         private string ParseIdentifier()
@@ -905,7 +1074,7 @@ public static partial class LuaModService
             var start = _index;
             if (IsEnd || !(char.IsLetter(Peek()) || Peek() == '_'))
             {
-                throw new FormatException("Expected Lua identifier.");
+                throw CreateFormatException("Expected Lua identifier.");
             }
 
             _index++;
@@ -938,7 +1107,7 @@ public static partial class LuaModService
                 sb.Append(ch);
             }
 
-            throw new FormatException("Unterminated Lua string.");
+            throw CreateFormatException("Unterminated Lua string.");
         }
 
         private void Expect(char expected)
@@ -946,11 +1115,16 @@ public static partial class LuaModService
             SkipWhitespace();
             if (IsEnd || _text[_index] != expected)
             {
-                throw new FormatException("Expected '" + expected + "'.");
+                throw CreateFormatException("Expected '" + expected + "'.");
             }
             _index++;
         }
 
+
+        private FormatException CreateFormatException(string message, Exception? innerException = null)
+        {
+            return new FormatException(message + " At character " + (_index + 1).ToString(CultureInfo.InvariantCulture) + ".", innerException);
+        }
         private char Peek() => IsEnd ? '\0' : _text[_index];
 
         private bool IsEnd => _index >= _text.Length;
@@ -962,8 +1136,7 @@ public static partial class LuaModService
     }
 
     private const string UiSupportBlock = """
--- UI_CONFIG_SUPPORT_BEGIN
--- Optional desktop-app overrides. Missing or broken ui_config.lua falls back to the base config.
+local UI_CONFIG_SUPPORT_BEGIN = true
 local function load_ui_config()
     local ok, ui_config = pcall(require, "ui_config")
     if ok and type(ui_config) == "table" then
@@ -1075,9 +1248,10 @@ local function apply_defaults_to_nil(destination, defaults)
         end
     end
 end
--- UI_CONFIG_SUPPORT_END
+local UI_CONFIG_SUPPORT_END = true
 """;
 
+    private static readonly Regex ReturnUiConfigPattern = new(@"\breturn\s+UiConfig\b", RegexOptions.Compiled);
     private static readonly Regex ItemEntryPattern = new(@"\[""(?<class>[^""]+)""\]\s*=\s*\{(?<body>.*?)\}", RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex QuotedClassPattern = new(@"""(?<class>[^""]+_C)""", RegexOptions.Compiled);
     private static readonly Regex OverridePattern = new(@"\[""(?<class>[^""]+)""\]\s*=\s*(?<value>-?\d+(?:\.\d+)?)", RegexOptions.Compiled);

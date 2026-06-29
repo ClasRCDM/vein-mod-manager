@@ -1,4 +1,3 @@
-﻿-- junk.lua
 return {
 		["BP_Ashes_C"] = {
 			Weight      = nil,
@@ -312,7 +311,7 @@ return {
 			bStackable  = nil,
 			_CDOPath = "/Game/Vein/Items/Junk/School/BP_Flask07.Default__BP_Flask07_C",
 		},
-		["BP_Floodlight_C"] = {
+		["BP_FloodLight_C"] = {
 			Weight      = nil,
 			MaxStack    = nil,
 			bStackable  = nil,

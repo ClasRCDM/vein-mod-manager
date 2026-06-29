@@ -1,0 +1,35 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{66A26720-8FB5-11D2-AA7E-00C04F688DDE}") = "src", "src", "{6B4980B6-D640-4D57-8C32-7A2DFDE66436}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VeinModManager", "src\VeinModManager\VeinModManager.csproj", "{58C09665-FB13-44C4-9DD0-7F7A522F1984}"
+EndProject
+Project("{66A26720-8FB5-11D2-AA7E-00C04F688DDE}") = "tests", "tests", "{9C869851-3A7B-4E1C-A907-E18C0B707145}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VeinModManager.SmokeTests", "tests\VeinModManager.SmokeTests\VeinModManager.SmokeTests.csproj", "{4C62D75F-0E33-4DD0-9E82-19D6F71C76A3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{58C09665-FB13-44C4-9DD0-7F7A522F1984}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58C09665-FB13-44C4-9DD0-7F7A522F1984}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58C09665-FB13-44C4-9DD0-7F7A522F1984}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58C09665-FB13-44C4-9DD0-7F7A522F1984}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C62D75F-0E33-4DD0-9E82-19D6F71C76A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C62D75F-0E33-4DD0-9E82-19D6F71C76A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C62D75F-0E33-4DD0-9E82-19D6F71C76A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C62D75F-0E33-4DD0-9E82-19D6F71C76A3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{58C09665-FB13-44C4-9DD0-7F7A522F1984} = {6B4980B6-D640-4D57-8C32-7A2DFDE66436}
+		{4C62D75F-0E33-4DD0-9E82-19D6F71C76A3} = {9C869851-3A7B-4E1C-A907-E18C0B707145}
+	EndGlobalSection
+EndGlobal
