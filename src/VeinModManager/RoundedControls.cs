@@ -126,7 +126,6 @@ public sealed partial class ThemedTextBox : TextBox
     public Color TextColor { get; set; } = Color.White;
     public Color PlaceholderColor { get; set; } = Color.FromArgb(118, 137, 163);
     public int Radius { get; set; } = 8;
-    internal int TextVerticalOffset { get; set; }
     private string _centeredPlaceholderText = string.Empty;
 
     public string CenteredPlaceholderText
@@ -279,7 +278,7 @@ public sealed partial class ThemedTextBox : TextBox
             (IntPtr)((HorizontalTextMargin << 16) | HorizontalTextMargin));
 
         var textHeight = TextRenderer.MeasureText("Ag", Font, Size.Empty, TextFormatFlags.NoPadding).Height;
-        var verticalInset = Math.Max(3, (Height - textHeight) / 2 + TextVerticalOffset);
+        var verticalInset = Math.Max(3, (Height - textHeight) / 2);
         var rect = new EditRect
         {
             Left = HorizontalTextMargin,
