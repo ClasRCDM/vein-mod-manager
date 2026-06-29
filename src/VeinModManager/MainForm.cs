@@ -1479,9 +1479,9 @@ public sealed partial class MainForm : Form
         var sessionName = AddCompactTextField(config, "Session name", 22, 110, 184, "Server");
         var serverPassword = AddCompactTextField(config, "Server password", 226, 110, 184, "", password: true);
         var mapSelection = AddCompactTextField(config, "Map selection", 22, 162, 250, "/Game/Vein/Maps/ChamplainValley?listen");
-        var maxPlayers = AddCompactTextField(config, "Max players", 292, 162, 118, "16");
-        var gamePort = AddCompactTextField(config, "Game port", 22, 214, 118, "7779");
-        var queryPort = AddCompactTextField(config, "Query port", 160, 214, 118, "27015");
+        var maxPlayers = AddCompactTextField(config, "Max players", 292, 162, 118, "16", numeric: true);
+        var gamePort = AddCompactTextField(config, "Game port", 22, 214, 118, "7779", numeric: true);
+        var queryPort = AddCompactTextField(config, "Query port", 160, 214, 118, "27015", numeric: true);
         config.Controls.Add(MakeLabel("Super Admin SteamIDs", 22, 246, 388, 20, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
         var superAdmins = NewTextBox(22, 268, 388, 30);
         config.Controls.Add(superAdmins);
@@ -1499,7 +1499,7 @@ public sealed partial class MainForm : Form
         panel.Controls.Add(network);
         var enableRcon = AddToggleRow(network, "Enable RCON", 22, 50);
         network.Controls.Add(MakeLabel("RCON port", 250, 26, 90, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        var rconPort = NewTextBox(250, 50, 80, 34);
+        var rconPort = NewNumberTextBox(250, 50, 80, 34);
         rconPort.Text = "27020";
         network.Controls.Add(rconPort);
         network.Controls.Add(MakeLabel("Password", 342, 26, 90, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
@@ -1507,7 +1507,7 @@ public sealed partial class MainForm : Form
         network.Controls.Add(rconPassword);
         var enableHttpApi = AddToggleRow(network, "Enable HTTP API", 22, 104);
         network.Controls.Add(MakeLabel("HTTP API port", 250, 80, 130, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        var httpApiPort = NewTextBox(250, 104, 120, 34);
+        var httpApiPort = NewNumberTextBox(250, 104, 120, 34);
         httpApiPort.Text = "8080";
         network.Controls.Add(httpApiPort);
         _windowsEnableRconToggle = enableRcon;
@@ -1524,7 +1524,7 @@ public sealed partial class MainForm : Form
         var connection = NewServerSection("Connection", 0, 0, 456, 300);
         panel.Controls.Add(connection);
         var host = AddTextField(connection, "Server host or IP", 22, 54, 184, "");
-        var port = AddTextField(connection, "SSH port", 226, 54, 84, "22");
+        var port = AddTextField(connection, "SSH port", 226, 54, 84, "22", numeric: true);
         var username = AddTextField(connection, "SSH username", 22, 112, 184, "root");
         connection.Controls.Add(MakeLabel("Authentication type", 226, 88, 184, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
         var authType = NewCombo(226, 112, 184, new[] { "SSH Key", "Password" });
@@ -1754,19 +1754,19 @@ public sealed partial class MainForm : Form
         return (fieldLabel, box, button);
     }
 
-    private static ThemedTextBox AddTextField(Control parent, string label, int x, int y, int width, string value, bool password = false)
+    private static ThemedTextBox AddTextField(Control parent, string label, int x, int y, int width, string value, bool password = false, bool numeric = false)
     {
         parent.Controls.Add(MakeLabel(label, x, y - 24, width, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        var box = NewTextBox(x, y, width, 34, password);
+        var box = numeric ? NewNumberTextBox(x, y, width, 34) : NewTextBox(x, y, width, 34, password);
         box.Text = value;
         parent.Controls.Add(box);
         return box;
     }
 
-    private static ThemedTextBox AddCompactTextField(Control parent, string label, int x, int y, int width, string value, bool password = false)
+    private static ThemedTextBox AddCompactTextField(Control parent, string label, int x, int y, int width, string value, bool password = false, bool numeric = false)
     {
         parent.Controls.Add(MakeLabel(label, x, y - 22, width, 20, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        var box = NewTextBox(x, y, width, 30, password);
+        var box = numeric ? NewNumberTextBox(x, y, width, 30) : NewTextBox(x, y, width, 30, password);
         box.Text = value;
         parent.Controls.Add(box);
         return box;
