@@ -3898,7 +3898,10 @@ public sealed partial class MainForm : Form
     private static ThemedTextBox NewNumberTextBox(int x, int y, int w, int h)
     {
         var box = NewTextBox(x, y, w, h);
+        box.Multiline = false;
+        box.AutoSize = true;
         box.TextAlign = HorizontalAlignment.Center;
+        box.Top = y + Math.Max(0, (h - box.Height) / 2);
         return box;
     }
 
