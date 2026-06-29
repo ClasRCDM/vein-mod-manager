@@ -3899,6 +3899,7 @@ public sealed partial class MainForm : Form
     {
         var box = NewTextBox(x, y, w, h);
         box.TextAlign = HorizontalAlignment.Center;
+        box.TextVerticalOffset = 3;
         return box;
     }
 
