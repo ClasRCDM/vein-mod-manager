@@ -160,25 +160,35 @@ public sealed class ScriptIconPanel : Control
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
         e.Graphics.Clear(BackColor);
+        const int scale = 3;
+        using var bitmap = new Bitmap(Math.Max(1, Width * scale), Math.Max(1, Height * scale));
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        graphics.PixelOffsetMode = PixelOffsetMode.Half;
+        graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        graphics.Clear(BackColor);
+        graphics.ScaleTransform(scale, scale);
 
         switch (Kind)
         {
             case ScriptIconKind.Clock:
-                DrawClock(e.Graphics, ClientRectangle, IconColor);
+                DrawClock(graphics, ClientRectangle, IconColor);
                 break;
             case ScriptIconKind.Bell:
-                DrawBell(e.Graphics, ClientRectangle, IconColor);
+                DrawBell(graphics, ClientRectangle, IconColor);
                 break;
             case ScriptIconKind.Disk:
-                DrawDisk(e.Graphics, ClientRectangle, IconColor);
+                DrawDisk(graphics, ClientRectangle, IconColor);
                 break;
             case ScriptIconKind.Bulb:
-                DrawBulb(e.Graphics, ClientRectangle, IconColor);
+                DrawBulb(graphics, ClientRectangle, IconColor);
                 break;
         }
+
+        e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+        e.Graphics.DrawImage(bitmap, ClientRectangle);
     }
 
     private static void DrawClock(Graphics graphics, Rectangle bounds, Color color)
@@ -186,34 +196,28 @@ public sealed class ScriptIconPanel : Control
         var size = Math.Min(bounds.Width, bounds.Height);
         var cx = bounds.Left + bounds.Width / 2f;
         var cy = bounds.Top + bounds.Height / 2f;
-        var face = new RectangleF(cx - size * 0.25f, cy - size * 0.22f, size * 0.5f, size * 0.5f);
-        var rim = RectangleF.Inflate(face, size * 0.045f, size * 0.045f);
-        using var rimBrush = new LinearGradientBrush(rim, Color.FromArgb(245, 248, 255), Color.FromArgb(138, 154, 183), 90f);
-        using var faceBrush = new SolidBrush(Color.FromArgb(252, 254, 255));
-        using var rimPen = new Pen(Color.FromArgb(220, 232, 255), Math.Max(1.5f, size * 0.028f));
-        using var handPen = new Pen(Color.FromArgb(23, 30, 46), Math.Max(1.7f, size * 0.032f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-        using var tickPen = new Pen(Color.FromArgb(72, 84, 112), Math.Max(1f, size * 0.018f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        var face = new RectangleF(cx - size * 0.29f, cy - size * 0.25f, size * 0.58f, size * 0.58f);
+        var rim = RectangleF.Inflate(face, size * 0.035f, size * 0.035f);
+        using var rimBrush = new LinearGradientBrush(rim, Color.FromArgb(250, 252, 255), Color.FromArgb(156, 171, 200), 90f);
+        using var faceBrush = new SolidBrush(Color.FromArgb(253, 254, 255));
+        using var rimPen = new Pen(Color.FromArgb(226, 236, 255), Math.Max(1.9f, size * 0.032f));
+        using var handPen = new Pen(Color.FromArgb(22, 29, 46), Math.Max(2.2f, size * 0.04f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var markerBrush = new SolidBrush(Color.FromArgb(70, 82, 108));
         using var darkBrush = new SolidBrush(Color.FromArgb(35, 43, 62));
         graphics.FillEllipse(rimBrush, rim);
         graphics.DrawEllipse(rimPen, rim);
         graphics.FillEllipse(faceBrush, face);
-        for (var i = 0; i < 12; i++)
-        {
-            var angle = Math.PI * 2d * i / 12d - Math.PI / 2d;
-            var outer = face.Width * 0.43f;
-            var inner = face.Width * 0.36f;
-            var x1 = cx + (float)Math.Cos(angle) * inner;
-            var y1 = cy + (float)Math.Sin(angle) * inner;
-            var x2 = cx + (float)Math.Cos(angle) * outer;
-            var y2 = cy + (float)Math.Sin(angle) * outer;
-            graphics.DrawLine(tickPen, x1, y1, x2, y2);
-        }
-        graphics.DrawLine(handPen, cx, cy, cx, cy - face.Height * 0.24f);
-        graphics.DrawLine(handPen, cx, cy, cx + face.Width * 0.18f, cy + face.Height * 0.12f);
-        graphics.FillEllipse(darkBrush, cx - size * 0.035f, cy - size * 0.035f, size * 0.07f, size * 0.07f);
-        using var bellBrush = new SolidBrush(Color.FromArgb(230, 236, 249));
-        graphics.FillEllipse(bellBrush, rim.Left + rim.Width * 0.05f, rim.Top - size * 0.06f, size * 0.13f, size * 0.1f);
-        graphics.FillEllipse(bellBrush, rim.Right - size * 0.18f, rim.Top - size * 0.06f, size * 0.13f, size * 0.1f);
+        var marker = Math.Max(2.1f, size * 0.038f);
+        graphics.FillEllipse(markerBrush, cx - marker / 2f, face.Top + face.Height * 0.12f, marker, marker);
+        graphics.FillEllipse(markerBrush, face.Right - face.Width * 0.15f - marker / 2f, cy - marker / 2f, marker, marker);
+        graphics.FillEllipse(markerBrush, cx - marker / 2f, face.Bottom - face.Height * 0.15f - marker / 2f, marker, marker);
+        graphics.FillEllipse(markerBrush, face.Left + face.Width * 0.15f - marker / 2f, cy - marker / 2f, marker, marker);
+        graphics.DrawLine(handPen, cx, cy, cx, cy - face.Height * 0.25f);
+        graphics.DrawLine(handPen, cx, cy, cx + face.Width * 0.2f, cy + face.Height * 0.13f);
+        graphics.FillEllipse(darkBrush, cx - size * 0.04f, cy - size * 0.04f, size * 0.08f, size * 0.08f);
+        using var bellBrush = new SolidBrush(Color.FromArgb(234, 240, 252));
+        graphics.FillEllipse(bellBrush, rim.Left + rim.Width * 0.06f, rim.Top - size * 0.065f, size * 0.14f, size * 0.105f);
+        graphics.FillEllipse(bellBrush, rim.Right - size * 0.2f, rim.Top - size * 0.065f, size * 0.14f, size * 0.105f);
     }
 
     private static void DrawBell(Graphics graphics, Rectangle bounds, Color color)
@@ -248,7 +252,7 @@ public sealed class ScriptIconPanel : Control
     private static void DrawDisk(Graphics graphics, Rectangle bounds, Color color)
     {
         var size = Math.Min(bounds.Width, bounds.Height);
-        var rect = new RectangleF(bounds.Left + size * 0.25f, bounds.Top + size * 0.18f, size * 0.5f, size * 0.6f);
+        var rect = new RectangleF(bounds.Left + size * 0.22f, bounds.Top + size * 0.15f, size * 0.56f, size * 0.66f);
         using var path = RoundedPanel.RoundedRect(Rectangle.Round(rect), Math.Max(2, (int)(size * 0.045f)));
         using var fill = new LinearGradientBrush(rect, Color.FromArgb(255, 255, 255), Color.FromArgb(178, 194, 224), 90f);
         using var pen = new Pen(Color.FromArgb(226, 235, 255), Math.Max(1.6f, size * 0.035f)) { LineJoin = LineJoin.Round };
