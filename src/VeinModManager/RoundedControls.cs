@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace VEIN_Item_And_Container_Modifier;
 
-public sealed class RoundedPanel : Panel
+public class RoundedPanel : Panel
 {
     public int Radius { get; set; } = 14;
     public Color FillColor { get; set; } = Color.FromArgb(10, 18, 30);
@@ -54,12 +54,46 @@ public sealed class RoundedPanel : Panel
     }
 }
 
+public sealed class RedGlowPanel : RoundedPanel
+{
+    public Color GlowColor { get; set; } = Color.FromArgb(125, 20, 28);
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        e.Graphics.Clear(BackColor);
+
+        using var path = RoundedRect(new Rectangle(1, 1, Width - 3, Height - 3), Radius);
+        using var fill = new SolidBrush(FillColor);
+        e.Graphics.FillPath(fill, path);
+
+        using var glowPath = new GraphicsPath();
+        glowPath.AddEllipse(Width / 3, -Height / 2, Width, Height);
+        using var glowBrush = new PathGradientBrush(glowPath)
+        {
+            CenterColor = Color.FromArgb(92, GlowColor),
+            SurroundColors = new[] { Color.FromArgb(0, GlowColor) }
+        };
+        e.Graphics.SetClip(path);
+        e.Graphics.FillPath(glowBrush, glowPath);
+        e.Graphics.ResetClip();
+
+        using var pen = new Pen(BorderColor, 1f);
+        e.Graphics.DrawPath(pen, path);
+    }
+}
+
 public sealed class RoundedButton : Button
 {
     public int Radius { get; set; } = 10;
     public Color FillColor { get; set; } = Color.FromArgb(32, 49, 75);
     public Color HoverColor { get; set; } = Color.FromArgb(43, 65, 99);
     public Color BorderColor { get; set; } = Color.FromArgb(54, 78, 116);
+    public string IconText { get; set; } = string.Empty;
+    public Font? IconFont { get; set; }
+    public int ContentLeftPadding { get; set; }
+    public int IconTextGap { get; set; } = 12;
     private bool _hover;
 
     public RoundedButton()
@@ -98,7 +132,36 @@ public sealed class RoundedButton : Button
         using var pen = new Pen(BorderColor, 1f);
         graphics.FillPath(fill, path);
         graphics.DrawPath(pen, path);
-        TextRenderer.DrawText(graphics, Text, Font, rect, ForeColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        if (string.IsNullOrEmpty(IconText))
+        {
+            TextRenderer.DrawText(
+                graphics,
+                Text,
+                Font,
+                rect,
+                ForeColor,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            return;
+        }
+
+        var iconBounds = new Rectangle(ContentLeftPadding, 0, 22, Height);
+        TextRenderer.DrawText(
+            graphics,
+            IconText,
+            IconFont ?? Font,
+            iconBounds,
+            ForeColor,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+
+        var textLeft = iconBounds.Right + IconTextGap;
+        var textBounds = new Rectangle(textLeft, 0, Math.Max(0, Width - textLeft - 12), Height);
+        TextRenderer.DrawText(
+            graphics,
+            Text,
+            Font,
+            textBounds,
+            ForeColor,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
     }
 
     protected override void OnPaintBackground(PaintEventArgs pevent)
@@ -669,15 +732,20 @@ public sealed class ThemedComboBox : Control
     {
         var centerX = bounds.Left + bounds.Width / 2;
         var centerY = bounds.Top + bounds.Height / 2 + 1;
+        var points = new[]
+        {
+            new Point(centerX - 5, centerY - 2),
+            new Point(centerX, centerY + 3),
+            new Point(centerX + 5, centerY - 2)
+        };
+
         using var pen = new Pen(MutedColor, 2f)
         {
             StartCap = LineCap.Round,
             EndCap = LineCap.Round,
             LineJoin = LineJoin.Round
         };
-        graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        graphics.DrawLine(pen, centerX - 5, centerY - 2, centerX, centerY + 3);
-        graphics.DrawLine(pen, centerX, centerY + 3, centerX + 5, centerY - 2);
+        graphics.DrawLines(pen, points);
     }
 
     public sealed class ThemedComboBoxItemCollection
@@ -993,8 +1061,12 @@ public sealed class ThemedCheckBox : CheckBox
                 EndCap = LineCap.Round,
                 LineJoin = LineJoin.Round
             };
-            e.Graphics.DrawLine(pen, 4, boxY + 8, 7, boxY + 11);
-            e.Graphics.DrawLine(pen, 7, boxY + 11, 12, boxY + 5);
+            e.Graphics.DrawLines(pen, new[]
+            {
+                new Point(4, boxY + 8),
+                new Point(7, boxY + 11),
+                new Point(12, boxY + 5)
+            });
         }
 
         var textBounds = new Rectangle(box.Right + 8, 0, Math.Max(0, Width - box.Right - 8), Height);

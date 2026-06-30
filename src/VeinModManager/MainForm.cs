@@ -2,36 +2,40 @@ using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Text.Json;
 using System.ComponentModel;
 
 namespace VEIN_Item_And_Container_Modifier;
 
 public sealed partial class MainForm : Form
 {
-    private static readonly Color AppBack = Color.FromArgb(5, 10, 18);
-    private static readonly Color PanelBack = Color.FromArgb(10, 18, 30);
-    private static readonly Color InnerBack = Color.FromArgb(3, 11, 20);
-    private static readonly Color Border = Color.FromArgb(34, 58, 90);
-    private static readonly Color BorderSoft = Color.FromArgb(28, 49, 78);
+    private static readonly Color AppBack = Color.FromArgb(4, 7, 14);
+    private static readonly Color PanelBack = Color.FromArgb(9, 15, 27);
+    private static readonly Color InnerBack = Color.FromArgb(6, 11, 21);
+    private static readonly Color SidebarBack = Color.FromArgb(8, 14, 25);
+    private static readonly Color Border = Color.FromArgb(28, 47, 76);
+    private static readonly Color BorderSoft = Color.FromArgb(21, 36, 58);
     private static readonly Color TextMain = Color.White;
-    private static readonly Color TextMuted = Color.FromArgb(177, 207, 242);
-    private static readonly Color Purple = Color.FromArgb(126, 58, 242);
-    private static readonly Color PurpleLight = Color.FromArgb(154, 85, 255);
+    private static readonly Color TextMuted = Color.FromArgb(184, 199, 224);
+    private static readonly Color TextDim = Color.FromArgb(128, 142, 169);
+    private static readonly Color Purple = Color.FromArgb(143, 18, 34);
+    private static readonly Color PurpleLight = Color.FromArgb(190, 38, 56);
     private static readonly Color Green = Color.FromArgb(0, 255, 102);
     private static readonly Color Orange = Color.FromArgb(255, 112, 0);
+    private static readonly Color Amber = Color.FromArgb(240, 167, 60);
     private static readonly Color Red = Color.FromArgb(255, 87, 87);
     private static readonly Color Cyan = Color.FromArgb(18, 223, 213);
+    private const int SidebarLeft = 18;
+    private const int SidebarTop = 52;
+    private const int SidebarWidth = 176;
+    private const int ContentLeft = 204;
+    private const int ContentRightPadding = 28;
+    private const int ContentTop = 154;
+    private const int ScriptsContentTop = 70;
+    private const int ServerContentTop = 262;
+    private const int ResizeBorderWidth = 8;
     private const int MaxVisibleComboRows = 14;
-    private const int DashboardActivityVisibleHeight = 610;
-    private const int DashboardActivityBottomPadding = 42;
-    private const int MaxLogLines = 500;
     private static readonly string[] BoolChoices = { "Game Default", "True", "False" };
-    private const string SettingsDirectoryName = "VeinModManager";
-    private const string SettingsFileName = "settings.json";
-    private static readonly JsonSerializerOptions SettingsJsonOptions = new() { WriteIndented = true };
 
     private readonly UiConfigState _state = new();
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
@@ -41,7 +45,12 @@ public sealed partial class MainForm : Form
     private Label _gameStatus = null!;
     private Label _ue4ssStatus = null!;
     private Label _modStatus = null!;
+    private Label _headerTitle = null!;
     private Label _headerSubtitle = null!;
+    private Panel _titleBar = null!;
+    private Button _minimizeButton = null!;
+    private Button _maximizeButton = null!;
+    private Button _closeButton = null!;
     private Label _unsavedStatus = null!;
     private Panel _contentShell = null!;
     private readonly List<Control> _overviewControls = new();
@@ -56,10 +65,14 @@ public sealed partial class MainForm : Form
     private RoundedPanel _importDropZone = null!;
     private Label _importConfigPathLabel = null!;
     private RoundedPanel _sidebar = null!;
+    private RoundedPanel _sidebarFooter = null!;
     private readonly Dictionary<string, Control> _tabPages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RoundedButton> _tabButtons = new(StringComparer.Ordinal);
+    private string _activeTab = "Mods";
     private readonly Dictionary<string, Control> _setupSubPages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RoundedButton> _setupSubButtons = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Control> _modsSubPages = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RoundedButton> _modsSubButtons = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Control> _serverSubPages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RoundedButton> _serverSubButtons = new(StringComparer.Ordinal);
     private readonly List<Control> _serverOverviewControls = new();
@@ -151,7 +164,6 @@ public sealed partial class MainForm : Form
         if (LoadWindowIcon() is { } windowIcon) Icon = windowIcon;
         BuildUi();
 
-        LoadPathSettings();
         AutoDetectPaths(log: true);
         LoadModFromPath();
 
@@ -160,26 +172,14 @@ public sealed partial class MainForm : Form
         UpdateStatuses();
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _statusTimer.Stop();
-            _statusTimer.Dispose();
-            _toolTip.Dispose();
-        }
-
-        base.Dispose(disposing);
-    }
-
     private void InitializeComponent()
     {
         AutoScaleDimensions = new SizeF(96F, 96F);
         AutoScaleMode = AutoScaleMode.Dpi;
         Text = "Vein Mod Manager";
-        ClientSize = new Size(1280, 800);
-        MinimumSize = new Size(1280, 760);
-        FormBorderStyle = FormBorderStyle.Sizable;
+        ClientSize = new Size(1064, 680);
+        MinimumSize = new Size(1000, 650);
+        FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = true;
         MinimizeBox = true;
         StartPosition = FormStartPosition.CenterScreen;
@@ -195,37 +195,6 @@ public sealed partial class MainForm : Form
         if (IsDesignerHosted) return;
 
         UseDarkTitleBar(Handle);
-    }
-
-    protected override void OnFormClosing(FormClosingEventArgs e)
-    {
-        if (!e.Cancel && _hasUnsavedChanges)
-        {
-            var result = MessageBox.Show(
-                this,
-                "You have unsaved config changes. Choose Yes to save, No to discard them, or Cancel to keep editing.",
-                "Save changes before closing?",
-                MessageBoxButtons.YesNoCancel,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button1);
-
-            if (result == DialogResult.Cancel)
-            {
-                e.Cancel = true;
-            }
-            else if (result == DialogResult.Yes && (!TrySaveConfig() || _hasUnsavedChanges))
-            {
-                e.Cancel = true;
-                MessageBox.Show(
-                    this,
-                    "The config could not be saved, so Vein Mod Manager will stay open. Check the log for details.",
-                    "Save failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
-        }
-
-        base.OnFormClosing(e);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -244,20 +213,51 @@ public sealed partial class MainForm : Form
         ApplyResponsiveLayout();
     }
 
-    private static readonly bool IsDesignerHosted = DetectDesignerHosted();
-
-    private static bool DetectDesignerHosted()
+    protected override void WndProc(ref Message m)
     {
-        if (LicenseManager.UsageMode == LicenseUsageMode.Designtime) return true;
+        const int wmNcHitTest = 0x0084;
+        const int htClient = 1;
 
-        var processName = Path.GetFileNameWithoutExtension(Environment.ProcessPath) ?? "";
-        return processName.Contains("devenv", StringComparison.OrdinalIgnoreCase)
-            || processName.Contains("DesignToolsServer", StringComparison.OrdinalIgnoreCase);
+        base.WndProc(ref m);
+        if (IsDesignerHosted || m.Msg != wmNcHitTest || WindowState == FormWindowState.Maximized)
+        {
+            return;
+        }
+
+        if ((int)m.Result != htClient)
+        {
+            return;
+        }
+
+        var cursor = PointToClient(Cursor.Position);
+        var left = cursor.X <= ResizeBorderWidth;
+        var right = cursor.X >= ClientSize.Width - ResizeBorderWidth;
+        var top = cursor.Y <= ResizeBorderWidth;
+        var bottom = cursor.Y >= ClientSize.Height - ResizeBorderWidth;
+
+        m.Result = (IntPtr)((left, right, top, bottom) switch
+        {
+            (true, false, true, false) => 13,
+            (false, true, true, false) => 14,
+            (true, false, false, true) => 16,
+            (false, true, false, true) => 17,
+            (true, false, false, false) => 10,
+            (false, true, false, false) => 11,
+            (false, false, true, false) => 12,
+            (false, false, false, true) => 15,
+            _ => htClient
+        });
     }
+
+    private static bool IsDesignerHosted =>
+        LicenseManager.UsageMode == LicenseUsageMode.Designtime
+        || Process.GetCurrentProcess().ProcessName.Contains("devenv", StringComparison.OrdinalIgnoreCase)
+        || Process.GetCurrentProcess().ProcessName.Contains("DesignToolsServer", StringComparison.OrdinalIgnoreCase);
 
     private void BuildUi()
     {
         Controls.Clear();
+        BuildTitleBar();
         BuildSidebar();
         BuildHeader();
         BuildStatusCards();
@@ -270,26 +270,44 @@ public sealed partial class MainForm : Form
     {
         if (_sidebar != null)
         {
-            _sidebar.Height = Math.Max(0, ClientSize.Height - 40);
+            _sidebar.Height = Math.Max(0, ClientSize.Height - SidebarTop - 20);
+        }
+
+        if (_titleBar != null)
+        {
+            _titleBar.Width = ClientSize.Width;
+        }
+
+        if (_minimizeButton != null && _maximizeButton != null && _closeButton != null)
+        {
+            _closeButton.Left = ClientSize.Width - 48;
+            _maximizeButton.Left = ClientSize.Width - 96;
+            _minimizeButton.Left = ClientSize.Width - 144;
+        }
+
+        if (_sidebarFooter != null && _sidebar != null)
+        {
+            _sidebarFooter.Top = Math.Max(0, _sidebar.Height - 102);
+            _sidebarFooter.Width = Math.Max(0, _sidebar.Width - 24);
         }
 
         if (_settingsButton != null)
         {
-            _settingsButton.Left = Math.Max(220, ClientSize.Width - 84);
+            _settingsButton.Left = Math.Max(ContentLeft, ClientSize.Width - 84);
         }
 
         if (_headerSubtitle != null)
         {
-            _headerSubtitle.Width = Math.Max(360, ClientSize.Width - 340);
+            _headerSubtitle.Width = Math.Max(360, ClientSize.Width - ContentLeft - 190);
         }
 
         if (_contentShell != null)
         {
-            var dashboardSelected = _tabPages.TryGetValue("Dashboard", out var dashboardPage) && dashboardPage.Visible;
-            var setupSelected = _tabPages.TryGetValue("Setup", out var setupPage) && setupPage.Visible;
-            var serverSelected = _tabPages.TryGetValue("Server Manager", out var serverPage) && serverPage.Visible;
-            _contentShell.Top = serverSelected ? 222 : 116;
-            _contentShell.Width = Math.Max(720, ClientSize.Width - 260);
+            var serverSelected = _activeTab.Equals("Server Manager", StringComparison.Ordinal);
+            var modsSelected = _activeTab.Equals("Mods", StringComparison.Ordinal);
+            _contentShell.Left = ContentLeft;
+            _contentShell.Top = modsSelected ? ScriptsContentTop : serverSelected ? ServerContentTop : ContentTop;
+            _contentShell.Width = Math.Max(720, ClientSize.Width - ContentLeft - ContentRightPadding);
             _contentShell.Height = Math.Max(420, ClientSize.Height - _contentShell.Top - 40);
 
             foreach (var page in _tabPages.Values)
@@ -298,8 +316,22 @@ public sealed partial class MainForm : Form
                 page.Height = _contentShell.Height;
             }
 
-            ResizeDashboardLayout();
             ResizeServerManagerLayout();
+            ResizeModsLayout();
+        }
+    }
+
+    private void ResizeModsLayout()
+    {
+        if (!_tabPages.TryGetValue("Mods", out var modsPage))
+        {
+            return;
+        }
+
+        foreach (var subPage in _modsSubPages.Values)
+        {
+            subPage.Width = Math.Max(760, modsPage.Width);
+            subPage.Height = Math.Max(420, modsPage.Height - subPage.Top);
         }
     }
 
@@ -307,10 +339,10 @@ public sealed partial class MainForm : Form
     {
         if (_serverOverviewControls.Count > 0)
         {
-            var x = 220;
-            var y = 116;
+            var x = ContentLeft;
+            var y = 154;
             var gap = 18;
-            var available = Math.Max(900, ClientSize.Width - x - 40);
+            var available = Math.Max(900, ClientSize.Width - x - ContentRightPadding);
             var cardWidth = Math.Max(210, Math.Min(250, (available - gap * 3) / 4));
 
             for (var index = 0; index < _serverOverviewControls.Count; index++)
@@ -327,7 +359,7 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        var innerWidth = Math.Max(720, panel.ClientSize.Width - 56);
+        var innerWidth = Math.Max(900, panel.Width - 56);
         if (_serverTypeCombo != null)
         {
             _serverTypeCombo.Width = 310;
@@ -371,53 +403,37 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void ResizeDashboardLayout()
-    {
-        if (!_tabPages.TryGetValue("Dashboard", out var dashboardPage) || _dashboardActivity is null) return;
-
-        _dashboardActivity.Left = 28;
-        _dashboardActivity.Width = Math.Max(300, dashboardPage.ClientSize.Width - 56);
-        _dashboardActivity.Top = Math.Max(552, dashboardPage.ClientSize.Height - DashboardActivityBottomPadding);
-        _dashboardActivity.Visible = dashboardPage.ClientSize.Height >= DashboardActivityVisibleHeight;
-    }
-
     private void DrawDesignerPreview(Graphics graphics)
     {
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         graphics.Clear(AppBack);
 
-        DrawPreviewPanel(graphics, new Rectangle(20, 20, 172, 740), 14, PanelBack, BorderSoft);
-        DrawPreviewLogo(graphics, new Rectangle(46, 74, 122, 122));
-        DrawPreviewLine(graphics, 38, 230, 136);
-        DrawPreviewTab(graphics, "Setup", 42, 258, 128, selected: true);
-        DrawPreviewTab(graphics, "Server Manager", 42, 310, 128, selected: false);
-        DrawPreviewTab(graphics, "Log", 42, 362, 128, selected: false);
+        DrawPreviewPanel(graphics, new Rectangle(SidebarLeft, SidebarTop, SidebarWidth, 740), 18, SidebarBack, BorderSoft);
+        DrawPreviewLogo(graphics, new Rectangle(46, 52, 138, 104));
+        DrawPreviewLine(graphics, 40, 214, SidebarWidth - 44);
+        DrawPreviewTab(graphics, "Dashboard", 36, 242, SidebarWidth - 36, selected: true);
+        DrawPreviewTab(graphics, "Setup", 36, 296, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Server Manager", 36, 350, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Mods", 36, 404, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Scripts", 36, 458, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Log", 36, 512, SidebarWidth - 36, selected: false);
+        DrawPreviewPanel(graphics, new Rectangle(34, 658, SidebarWidth - 32, 86), 8, InnerBack, BorderSoft);
+        DrawPreviewText(graphics, "Vein Mod Manager", 50, 672, 9.5F, FontStyle.Regular, TextMuted, width: 140);
+        DrawPreviewText(graphics, "v1.0.0", 50, 694, 8.5F, FontStyle.Regular, TextDim, width: 140);
+        DrawPreviewText(graphics, "System Online", 50, 718, 8.5F, FontStyle.Bold, Green, width: 140);
 
-        DrawPreviewText(graphics, "Vein Manager", 220, 72, 28, FontStyle.Bold, TextMain);
-        DrawPreviewText(graphics, "Modify VEIN item, backpack, vehicle, and container values without editing config files.", 222, 116, 13, FontStyle.Regular, TextMuted);
+        DrawPreviewText(graphics, "Vein Manager", ContentLeft, 76, 28, FontStyle.Bold, TextMain);
+        DrawPreviewText(graphics, "Modify VEIN item, backpack, vehicle, and container values without editing config files.", ContentLeft + 2, 120, 13, FontStyle.Regular, TextMuted);
         DrawPreviewPanel(graphics, new Rectangle(1196, 58, 52, 52), 12, InnerBack, BorderSoft);
         DrawPreviewText(graphics, "\uE713", 1211, 72, 17, FontStyle.Regular, TextMain, "Segoe MDL2 Assets");
 
-        DrawPreviewStatusCard(graphics, "Game", "Closed", "VEIN process", Orange, 220, 148);
-        DrawPreviewStatusCard(graphics, "UE4SS", "Found", "Detected in game folder", Green, 498, 148);
-        DrawPreviewStatusCard(graphics, "Mod", "Found", "ItemAndContainerModifier", Green, 776, 148);
-
-        DrawPreviewPanel(graphics, new Rectangle(220, 222, 1020, 570), 12, PanelBack, Border);
-        DrawPreviewText(graphics, "Setup", 256, 254, 20, FontStyle.Bold, TextMain);
-        DrawPreviewButton(graphics, "Readme", 1054, 250, 126, 44, main: false);
-        DrawPreviewText(graphics, "Select your VEIN install and the UE4SS mod folder. The editor writes generated overrides only.", 256, 292, 13, FontStyle.Regular, TextMuted);
-        DrawPreviewText(graphics, "Game folder", 256, 342, 13, FontStyle.Bold, TextMuted);
-        DrawPreviewTextBox(graphics, @"C:\Program Files (x86)\Steam\steamapps\common\Vein", 256, 366, 660);
-        DrawPreviewButton(graphics, "Browse", 930, 362, 110, 44, main: false);
-        DrawPreviewButton(graphics, "Auto Detect", 1054, 362, 126, 44, main: false);
-        DrawPreviewText(graphics, "Mod folder", 256, 438, 13, FontStyle.Bold, TextMuted);
-        DrawPreviewTextBox(graphics, @"C:\Program Files (x86)\Steam\steamapps\common\Vein\Vein\Binaries\Win64\ue4ss\Mods\ItemAndContainerModifier", 256, 462, 660);
-        DrawPreviewButton(graphics, "Browse", 930, 458, 110, 44, main: false);
-        DrawPreviewButton(graphics, "Open Folder", 1054, 458, 126, 44, main: false);
-        DrawPreviewText(graphics, "No unsaved changes (7 edits)", 256, 616, 13, FontStyle.Bold, Cyan);
-        DrawPreviewButton(graphics, "Save Config", 256, 652, 190, 54, main: true);
-        DrawPreviewButton(graphics, "Backup Now", 462, 652, 170, 54, main: false);
-        DrawPreviewButton(graphics, "Launch VEIN", 652, 652, 170, 54, main: false);
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft, ContentTop, 998, 606), 12, PanelBack, Border);
+        DrawPreviewText(graphics, "Dashboard", ContentLeft + 28, ContentTop + 34, 20, FontStyle.Bold, TextMain);
+        DrawPreviewText(graphics, "Overview, loaded data, config activity, and server status at a glance.", ContentLeft + 30, ContentTop + 72, 13, FontStyle.Regular, TextMuted);
+        DrawPreviewStatusCard(graphics, "Game Status", "Closed", "VEIN process", Orange, ContentLeft + 28, ContentTop + 116);
+        DrawPreviewStatusCard(graphics, "UE4SS Status", "Found", "Detected in game folder", Green, ContentLeft + 274, ContentTop + 116);
+        DrawPreviewStatusCard(graphics, "Mod Status", "Found", "ItemAndContainerModifier", Green, ContentLeft + 520, ContentTop + 116);
+        DrawPreviewStatusCard(graphics, "Server Summary", "Stopped / Local", "Server Manager status", Orange, ContentLeft + 766, ContentTop + 116);
     }
 
     private static void DrawPreviewLogo(Graphics graphics, Rectangle bounds)
@@ -432,25 +448,30 @@ public sealed partial class MainForm : Form
         {
             using var image = Image.FromFile(logoPath);
             graphics.DrawImage(image, bounds);
+            using var captionBack = new SolidBrush(Color.FromArgb(220, 8, 5, 6));
+            graphics.FillRectangle(captionBack, bounds.Left, bounds.Bottom - 34, bounds.Width, 34);
+            DrawPreviewText(graphics, "MOD MANAGER", bounds.Left, bounds.Bottom - 26, 9.5F, FontStyle.Bold, TextMuted, width: bounds.Width, alignment: StringAlignment.Center);
             return;
         }
 
         DrawPreviewPanel(graphics, bounds, 2, Color.Black, BorderSoft);
-        DrawPreviewText(graphics, "VEIN", bounds.Left + 18, bounds.Top + 42, 24, FontStyle.Bold, TextMain);
+        DrawPreviewText(graphics, "VEIN", bounds.Left + 18, bounds.Top + 32, 24, FontStyle.Bold, TextMain);
+        DrawPreviewText(graphics, "MOD MANAGER", bounds.Left, bounds.Bottom - 26, 9.5F, FontStyle.Bold, TextMuted, width: bounds.Width, alignment: StringAlignment.Center);
     }
 
     private static void DrawPreviewStatusCard(Graphics graphics, string title, string value, string subtitle, Color valueColor, int x, int y)
     {
-        DrawPreviewPanel(graphics, new Rectangle(x, y, 260, 92), 10, PanelBack, BorderSoft);
-        DrawPreviewText(graphics, title, x + 24, y + 14, 12, FontStyle.Regular, TextMuted);
-        DrawPreviewText(graphics, value, x + 24, y + 34, 20, FontStyle.Regular, valueColor);
-        DrawPreviewText(graphics, subtitle, x + 24, y + 62, 9, FontStyle.Regular, TextMuted);
+        const int width = 218;
+        DrawPreviewPanel(graphics, new Rectangle(x, y, width, 86), 12, Color.FromArgb(10, 17, 31), BorderSoft);
+        DrawPreviewText(graphics, title, x + 22, y + 12, 10.5F, FontStyle.Regular, TextMuted, width: width - 44);
+        DrawPreviewText(graphics, value, x + 20, y + 30, 16, FontStyle.Regular, valueColor, width: width - 42);
+        DrawPreviewText(graphics, subtitle, x + 22, y + 60, 8.5F, FontStyle.Regular, TextMuted, width: width - 44);
     }
 
     private static void DrawPreviewTab(Graphics graphics, string text, int x, int y, int width, bool selected)
     {
-        DrawPreviewPanel(graphics, new Rectangle(x, y, width, 44), 14, selected ? Purple : InnerBack, selected ? PurpleLight : BorderSoft);
-        DrawPreviewText(graphics, text, x, y + 13, 11, FontStyle.Bold, TextMain, width: width, alignment: StringAlignment.Center);
+        DrawPreviewPanel(graphics, new Rectangle(x, y, width, 46), 8, selected ? Purple : InnerBack, selected ? PurpleLight : BorderSoft);
+        DrawPreviewText(graphics, text, x + 44, y + 14, 9.5F, FontStyle.Bold, TextMain, width: width - 56);
     }
 
     private static void DrawPreviewTextBox(Graphics graphics, string text, int x, int y, int width)
@@ -562,41 +583,165 @@ public sealed partial class MainForm : Form
         Log("Tooltips " + (enabled ? "enabled." : "disabled."));
     }
 
+    private void BuildTitleBar()
+    {
+        _titleBar = new Panel
+        {
+            Left = 0,
+            Top = 0,
+            Width = ClientSize.Width,
+            Height = 36,
+            BackColor = Color.FromArgb(19, 21, 29)
+        };
+        _titleBar.MouseDown += TitleBarMouseDown;
+        Controls.Add(_titleBar);
+
+        if (LoadLogoImage() is { } iconImage)
+        {
+            var icon = new PictureBox
+            {
+                Left = 12,
+                Top = 9,
+                Width = 18,
+                Height = 18,
+                Image = iconImage,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = _titleBar.BackColor
+            };
+            icon.MouseDown += TitleBarMouseDown;
+            _titleBar.Controls.Add(icon);
+        }
+
+        var title = MakeLabel("Vein Mod Manager", 39, 6, 220, 24, 9F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, _titleBar.BackColor);
+        title.MouseDown += TitleBarMouseDown;
+        _titleBar.Controls.Add(title);
+
+        _minimizeButton = MakeWindowButton("\uE921", () => WindowState = FormWindowState.Minimized);
+        _maximizeButton = MakeWindowButton("\uE922", ToggleWindowMaximized);
+        _closeButton = MakeWindowButton("\uE8BB", Close);
+        _titleBar.Controls.Add(_minimizeButton);
+        _titleBar.Controls.Add(_maximizeButton);
+        _titleBar.Controls.Add(_closeButton);
+
+        _titleBar.Controls.Add(new Panel
+        {
+            Left = 0,
+            Top = 35,
+            Width = ClientSize.Width,
+            Height = 1,
+            BackColor = Color.FromArgb(28, 32, 48),
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
+        });
+    }
+
+    private static Button MakeWindowButton(string text, Action action)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Top = 0,
+            Width = 48,
+            Height = 35,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(19, 21, 29),
+            ForeColor = TextDim,
+            Font = new Font("Segoe MDL2 Assets", 9F, FontStyle.Regular),
+            TabStop = false,
+            Cursor = Cursors.Hand
+        };
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(31, 35, 49);
+        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(41, 46, 64);
+        button.Click += (_, _) => action();
+        return button;
+    }
+
+    private void TitleBarMouseDown(object? sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left)
+        {
+            return;
+        }
+
+        ReleaseCapture();
+        _ = SendMessage(Handle, 0x00A1, (IntPtr)2, IntPtr.Zero);
+    }
+
+    private void ToggleWindowMaximized()
+    {
+        WindowState = WindowState == FormWindowState.Maximized
+            ? FormWindowState.Normal
+            : FormWindowState.Maximized;
+    }
+
     private void BuildSidebar()
     {
-        _sidebar = NewPanel(18, 20, 20, 172, 740);
+        _sidebar = NewPanel(18, SidebarLeft, SidebarTop, SidebarWidth, 740);
+        _sidebar.FillColor = SidebarBack;
+        _sidebar.BorderColor = BorderSoft;
         Controls.Add(_sidebar);
 
-        var logo = new PictureBox
+        var logo = new RoundedPanel
         {
-            Left = 24,
-            Top = 24,
-            Width = 124,
-            Height = 124,
-            SizeMode = PictureBoxSizeMode.Zoom,
-            BackColor = InnerBack
+            Left = 18,
+            Top = 34,
+            Width = 128,
+            Height = 104,
+            Radius = 10,
+            FillColor = Color.FromArgb(34, 8, 12),
+            BorderColor = Color.FromArgb(55, 16, 25),
+            BackColor = SidebarBack
         };
-
-        try
+        if (LoadLogoImage() is { } logoImage)
         {
-            var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "vein-logo.png");
-            if (!File.Exists(logoPath))
+            logo.Controls.Add(new PictureBox
             {
-                logoPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Assets", "vein-logo.png");
-            }
-            if (File.Exists(logoPath))
-            {
-                using var stream = File.OpenRead(logoPath);
-                using var image = Image.FromStream(stream);
-                logo.Image = new Bitmap(image);
-            }
+                Left = 1,
+                Top = 1,
+                Width = logo.Width - 2,
+                Height = logo.Height - 2,
+                Image = logoImage,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = logo.FillColor
+            });
         }
-        catch
+        else
         {
+            logo.Controls.Add(MakeLabel("VEIN", 0, 28, logo.Width, 42, 23, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, logo.FillColor));
         }
 
+        var caption = new Label
+        {
+            Left = 0,
+            Top = 76,
+            Width = logo.Width,
+            Height = 28,
+            Text = "MOD MANAGER",
+            Font = new Font("Segoe UI", 8.6F, FontStyle.Bold),
+            ForeColor = TextMuted,
+            BackColor = Color.FromArgb(220, 8, 5, 6),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+        logo.Controls.Add(caption);
+        caption.BringToFront();
         _sidebar.Controls.Add(logo);
-        _sidebar.Controls.Add(Line(18, 178, 136));
+        _sidebar.Controls.Add(Line(20, 180, SidebarWidth - 40));
+
+        _sidebarFooter = NewPanel(8, 12, 638, SidebarWidth - 24, 86);
+        _sidebarFooter.FillColor = InnerBack;
+        _sidebarFooter.BorderColor = BorderSoft;
+        _sidebarFooter.BackColor = SidebarBack;
+        _sidebarFooter.Controls.Add(MakeLabel("v1.0.0", 14, 10, _sidebarFooter.Width - 28, 18, 8.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, InnerBack));
+        _sidebarFooter.Controls.Add(MakeLabel("\u00A9 2026 Your Studio", 14, 30, _sidebarFooter.Width - 28, 18, 8.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, InnerBack));
+        _sidebarFooter.Controls.Add(MakeLabel("\u2022 System Online", 14, 58, 100, 18, 7.8F, FontStyle.Bold, Green, ContentAlignment.MiddleLeft, InnerBack));
+        var footerSettings = MakeButton("\uE713", _sidebarFooter.Width - 34, 50, 30, 30, () => ShowTab("Settings"));
+        footerSettings.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
+        footerSettings.FillColor = Color.FromArgb(16, 20, 30);
+        footerSettings.HoverColor = Color.FromArgb(26, 31, 44);
+        footerSettings.BorderColor = Color.FromArgb(36, 42, 56);
+        footerSettings.Radius = 8;
+        _sidebarFooter.Controls.Add(footerSettings);
+        _sidebar.Controls.Add(_sidebarFooter);
     }
 
     private static Icon? LoadWindowIcon()
@@ -611,13 +756,26 @@ public sealed partial class MainForm : Form
         return iconPath == null ? null : new Icon(iconPath);
     }
 
+    private static Image? LoadLogoImage()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Assets", "vein-logo.png"),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Assets", "vein-logo.png"))
+        };
+
+        var logoPath = candidates.FirstOrDefault(File.Exists);
+        return logoPath == null ? null : Image.FromFile(logoPath);
+    }
+
     private void BuildHeader()
     {
-        Controls.Add(MakeLabel("Vein Manager", 220, 30, 610, 42, 28, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
-        _headerSubtitle = MakeLabel("Modify VEIN item, backpack, vehicle, and container values without editing config files.", 222, 74, 880, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, AppBack);
+        _headerTitle = MakeLabel("Vein Manager", ContentLeft, 54, 610, 44, 28, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack);
+        Controls.Add(_headerTitle);
+        _headerSubtitle = MakeLabel("Modify VEIN item, backpack, vehicle, and container values without editing config files.", ContentLeft + 2, 100, 880, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, AppBack);
         Controls.Add(_headerSubtitle);
 
-        _settingsButton = MakeButton("\uE713", 1196, 28, 52, 52, () => ShowTab("Settings"));
+        _settingsButton = MakeButton("\uE713", 1196, 50, 52, 52, () => ShowTab("Settings"));
         _settingsButton.AccessibleName = "Settings";
         _settingsButton.Font = new Font("Segoe MDL2 Assets", 17F, FontStyle.Regular);
         _settingsButton.FillColor = InnerBack;
@@ -630,8 +788,8 @@ public sealed partial class MainForm : Form
     private void BuildStatusCards()
     {
         _overviewControls.Clear();
-        var x = 220;
-        var y = 116;
+        var x = ContentLeft;
+        var y = 154;
         var w = 260;
         var h = 92;
         var gap = 18;
@@ -655,8 +813,8 @@ public sealed partial class MainForm : Form
     private void BuildServerTopStatusCards()
     {
         _serverOverviewControls.Clear();
-        var x = 220;
-        var y = 116;
+        var x = ContentLeft;
+        var y = 154;
         var w = 220;
         var h = 92;
         var gap = 18;
@@ -686,9 +844,9 @@ public sealed partial class MainForm : Form
 
         var shell = new Panel
         {
-            Left = 220,
-            Top = 222,
-            Width = 1020,
+            Left = ContentLeft,
+            Top = ContentTop,
+            Width = 998,
             Height = 570,
             BackColor = AppBack
         };
@@ -698,16 +856,17 @@ public sealed partial class MainForm : Form
         _tabPages["Setup"] = BuildSetupTab();
         _tabPages["Settings"] = BuildSettingsTab();
         _tabPages["Server Manager"] = BuildServerManagerTab();
+        _tabPages["Mods"] = BuildModsTab();
         _tabPages["Log"] = BuildLogTab();
 
-        var y = 214;
+        var y = 204;
         foreach (var title in new[] { "Dashboard", "Setup", "Server Manager" })
         {
-            var button = NewSidebarTabButton(title, 18, y);
+            var button = NewSidebarTabButton(title, 14, y);
             button.Click += (_, _) => ShowTab(title);
             _tabButtons[title] = button;
             _sidebar.Controls.Add(button);
-            y += 52;
+            y += 54;
         }
 
         AddSidebarShortcut("Server Settings", y, () =>
@@ -715,15 +874,22 @@ public sealed partial class MainForm : Form
             ShowTab("Server Manager");
             ShowServerSubTab("Connection / Config");
         }, "Open the server connection and config settings.");
-        y += 52;
+        y += 54;
 
-        AddSidebarShortcut("Mods", y, OpenModFolder, "Open the selected mod folder.");
-        y += 52;
+        var modsButton = NewSidebarTabButton("Mods", 14, y);
+        modsButton.Click += (_, _) => ShowTab("Mods");
+        _tabButtons["Mods"] = modsButton;
+        _sidebar.Controls.Add(modsButton);
+        y += 54;
 
-        AddSidebarShortcut("Scripts", y, OpenConfigFolder, "Open the selected mod Scripts folder.");
-        y += 52;
+        AddSidebarShortcut("Scripts", y, () =>
+        {
+            ShowTab("Mods");
+            ShowModsSubTab("Scripts");
+        }, "Open the Scripts workspace.");
+        y += 54;
 
-        var logButton = NewSidebarTabButton("Log", 18, y);
+        var logButton = NewSidebarTabButton("Log", 14, y);
         logButton.Click += (_, _) => ShowTab("Log");
         _tabButtons["Log"] = logButton;
         _sidebar.Controls.Add(logButton);
@@ -735,12 +901,12 @@ public sealed partial class MainForm : Form
         }
 
         Controls.Add(shell);
-        ShowTab("Dashboard");
+        ShowTab("Mods");
     }
 
     private void AddSidebarShortcut(string title, int y, Action action, string tip)
     {
-        var button = NewSidebarTabButton(title, 18, y);
+        var button = NewSidebarTabButton(title, 14, y);
         button.Click += (_, _) => action();
         AddTip(button, tip);
         _sidebar.Controls.Add(button);
@@ -748,6 +914,8 @@ public sealed partial class MainForm : Form
 
     private void ShowTab(string title)
     {
+        _activeTab = title;
+
         foreach (var (name, page) in _tabPages)
         {
             var selected = name.Equals(title, StringComparison.Ordinal);
@@ -779,7 +947,13 @@ public sealed partial class MainForm : Form
         var dashboardSelected = title.Equals("Dashboard", StringComparison.Ordinal);
         var setupSelected = title.Equals("Setup", StringComparison.Ordinal);
         var serverSelected = title.Equals("Server Manager", StringComparison.Ordinal);
-        _headerSubtitle.Visible = dashboardSelected || setupSelected;
+        var fullPageSelected = title.Equals("Mods", StringComparison.Ordinal);
+        _headerTitle.Visible = !fullPageSelected;
+        _headerSubtitle.Visible = (dashboardSelected || setupSelected) && !fullPageSelected;
+        if (_settingsButton != null)
+        {
+            _settingsButton.Visible = !fullPageSelected;
+        }
         foreach (var control in _overviewControls)
         {
             control.Visible = false;
@@ -792,7 +966,9 @@ public sealed partial class MainForm : Form
 
         if (_contentShell != null)
         {
-            _contentShell.Top = serverSelected ? 222 : 116;
+            _contentShell.Top = title.Equals("Mods", StringComparison.Ordinal)
+                ? ScriptsContentTop
+                : serverSelected ? ServerContentTop : ContentTop;
             _contentShell.Height = Math.Max(420, ClientSize.Height - _contentShell.Top - 40);
         }
 
@@ -803,8 +979,6 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildDashboardTab()
     {
         var panel = NewPanel(12, 0, 0, 1020, 570);
-        panel.AutoScroll = true;
-        panel.AutoScrollMinSize = new Size(0, 600);
         panel.Controls.Add(MakeLabel("Dashboard", 28, 24, 360, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
         panel.Controls.Add(MakeLabel("Overview, loaded data, config activity, and server status at a glance.", 30, 62, 760, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
 
@@ -829,10 +1003,9 @@ public sealed partial class MainForm : Form
         _dashboardActivity = new RichTextBox
         {
             Left = 28,
-            Top = 552,
+            Top = 570,
             Width = 948,
             Height = 28,
-            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
             BackColor = InnerBack,
             ForeColor = TextMuted,
             Font = new Font("Consolas", 9.5F, FontStyle.Regular),
@@ -862,6 +1035,456 @@ public sealed partial class MainForm : Form
         chart.Controls.Add(value);
         _dashboardValues[key] = value;
         parent.Controls.Add(chart);
+    }
+
+    private RoundedPanel BuildModsTab()
+    {
+        var panel = new RedGlowPanel
+        {
+            Left = 0,
+            Top = 0,
+            Width = 1020,
+            Height = 690,
+            Radius = 0,
+            FillColor = AppBack,
+            BorderColor = AppBack,
+            BackColor = AppBack,
+            GlowColor = Color.FromArgb(120, 18, 30)
+        };
+        _modsSubPages.Clear();
+        _modsSubButtons.Clear();
+
+        var pageTitle = MakeLabel("Mods", 0, 0, 360, 42, 23, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent);
+        var subtitle = MakeLabel("Active mods loaded on your server. Enable, disable or remove them.", 0, 42, 780, 26, 11.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
+        panel.Controls.Add(pageTitle);
+        panel.Controls.Add(subtitle);
+
+        var x = 0;
+        foreach (var (title, width) in new[] { ("Installed Mods", 112), ("Nexus Search", 112), ("Scripts", 82) })
+        {
+            var button = NewTabButton(title, x, 78, width);
+            button.Height = 38;
+            button.Radius = 8;
+            button.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            button.Click += (_, _) => ShowModsSubTab(title);
+            _modsSubButtons[title] = button;
+            panel.Controls.Add(button);
+            x += width + 10;
+        }
+
+        _modsSubPages["Installed Mods"] = BuildInstalledModsPane();
+        _modsSubPages["Nexus Search"] = BuildNexusSearchPane();
+        _modsSubPages["Scripts"] = BuildScriptsTab();
+
+        foreach (var page in _modsSubPages.Values)
+        {
+            page.Top = 126;
+            page.Width = panel.Width;
+            page.Height = Math.Max(420, panel.Height - page.Top);
+            page.Visible = false;
+            panel.Controls.Add(page);
+        }
+
+        ShowModsSubTab("Installed Mods");
+        return panel;
+    }
+
+    private void ShowModsSubTab(string title)
+    {
+        foreach (var (name, page) in _modsSubPages)
+        {
+            var selected = name.Equals(title, StringComparison.Ordinal);
+            page.Visible = selected;
+            if (selected)
+            {
+                page.BringToFront();
+            }
+        }
+
+        foreach (var (name, button) in _modsSubButtons)
+        {
+            var selected = name.Equals(title, StringComparison.Ordinal);
+            button.FillColor = selected ? Purple : InnerBack;
+            button.HoverColor = selected ? PurpleLight : Color.FromArgb(18, 24, 40);
+            button.BorderColor = selected ? PurpleLight : BorderSoft;
+            button.Invalidate();
+        }
+    }
+
+    private RoundedPanel BuildInstalledModsPane()
+    {
+        var pane = NewPanel(0, 0, 0, 1020, 560);
+        pane.FillColor = AppBack;
+        pane.BorderColor = AppBack;
+
+        pane.Controls.Add(MakeLabel("6 of 8 active", 0, 0, 86, 24, 10F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent));
+        pane.Controls.Add(MakeLabel("1 update available", 88, 0, 140, 24, 10F, FontStyle.Bold, Amber, ContentAlignment.MiddleLeft, Color.Transparent));
+
+        var checkUpdates = MakeButton("\u27F3 Check for updates", 838, -2, 164, 34, () => ShowModsSubTab("Nexus Search"));
+        checkUpdates.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        checkUpdates.FillColor = Color.FromArgb(12, 15, 24);
+        checkUpdates.BorderColor = Color.FromArgb(49, 43, 55);
+        checkUpdates.HoverColor = Color.FromArgb(24, 26, 38);
+        pane.Controls.Add(checkUpdates);
+
+        var list = NewPanel(12, 0, 42, 500, 466);
+        list.FillColor = Color.FromArgb(10, 16, 31);
+        list.BorderColor = Color.FromArgb(18, 28, 47);
+        pane.Controls.Add(list);
+
+        list.Controls.Add(MakeLabel("#", 20, 14, 30, 20, 8.5F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, list.FillColor));
+        list.Controls.Add(MakeLabel("MOD", 64, 14, 180, 20, 8.5F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, list.FillColor));
+        var versionHeader = MakeLabel("VERSION", 328, 14, 82, 20, 8.5F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, list.FillColor);
+        var enabledHeader = MakeLabel("ENABLED", 408, 14, 78, 20, 8.5F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, list.FillColor);
+        var divider = Line(14, 38, 470);
+        list.Controls.Add(versionHeader);
+        list.Controls.Add(enabledHeader);
+        list.Controls.Add(divider);
+
+        var mods = new[]
+        {
+            ("01", "Expanded Stash", "GraveDigger", "Inventory", "2.2.0", false, false),
+            ("02", "Dynamic Weather", "StormByte", "Environment", "1.4.2", false, false),
+            ("03", "Horde Nights", "NecroDev", "Gameplay", "3.0.1", true, false),
+            ("04", "Champlain Valley Map", "VeinCartography", "Maps", "1.0.0", true, false),
+            ("05", "Quick Stack", "ToolboxModding", "QoL", "0.9.4", true, true),
+            ("06", "Reworked Loot Tables", "LootLord", "Gameplay", "1.2.0", true, false),
+            ("07", "Drivable Vehicles", "GearHead", "Vehicles", "0.5.0", true, false),
+            ("08", "Night Vision Optics", "Spectra", "Equipment", "1.1.3", true, false)
+        };
+
+        var rowTop = 42;
+        foreach (var mod in mods)
+        {
+            list.Controls.Add(BuildInstalledModRow(mod.Item1, mod.Item2, mod.Item3, mod.Item4, mod.Item5, mod.Item6, mod.Item7, rowTop));
+            rowTop += 45;
+        }
+
+        var details = BuildModDetailsPane(516, 42);
+        pane.Controls.Add(details);
+        pane.Resize += (_, _) => ResizeInstalledModsPane(pane, list, details, checkUpdates, versionHeader, enabledHeader, divider);
+        ResizeInstalledModsPane(pane, list, details, checkUpdates, versionHeader, enabledHeader, divider);
+        return pane;
+    }
+
+    private static void ResizeInstalledModsPane(
+        Control pane,
+        RoundedPanel list,
+        RoundedPanel details,
+        Control checkUpdates,
+        Control versionHeader,
+        Control enabledHeader,
+        Control divider)
+    {
+        var availableWidth = Math.Max(820, pane.Width);
+        var availableHeight = Math.Max(450, pane.Height);
+        var gap = 18;
+        var listWidth = Math.Max(500, Math.Min(820, (int)(availableWidth * 0.58)));
+        var detailsWidth = Math.Min(520, Math.Max(310, availableWidth - listWidth - gap));
+        var cardHeight = Math.Max(420, Math.Min(466, availableHeight - list.Top - 24));
+
+        checkUpdates.Left = Math.Max(0, availableWidth - checkUpdates.Width - 18);
+
+        list.Width = listWidth;
+        list.Height = cardHeight;
+        details.Left = list.Right + gap;
+        details.Width = detailsWidth;
+        details.Height = cardHeight;
+
+        versionHeader.Left = Math.Max(280, list.Width - 170);
+        enabledHeader.Left = Math.Max(360, list.Width - 92);
+        divider.Width = Math.Max(120, list.Width - 28);
+
+        foreach (Control control in list.Controls)
+        {
+            if (control is RoundedPanel row && row.Tag is string tag && tag.Equals("installed-mod-row", StringComparison.Ordinal))
+            {
+                row.Width = list.Width - 2;
+            }
+        }
+    }
+
+    private RoundedPanel BuildInstalledModRow(string index, string name, string author, string category, string version, bool enabled, bool selected, int y)
+    {
+        var row = NewPanel(0, 0, y, 498, 45);
+        row.Tag = "installed-mod-row";
+        row.FillColor = selected ? Color.FromArgb(30, 19, 34) : Color.FromArgb(10, 16, 31);
+        row.BorderColor = row.FillColor;
+        row.BackColor = Color.FromArgb(10, 16, 31);
+
+        if (selected)
+        {
+            row.Controls.Add(new Panel { Left = 0, Top = 0, Width = 3, Height = 45, BackColor = PurpleLight });
+        }
+
+        row.Controls.Add(MakeLabel(index, 18, 12, 30, 20, 9F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, row.FillColor));
+        var thumb = NewPanel(5, 52, 8, 30, 30);
+        thumb.FillColor = Color.FromArgb(19, 27, 45);
+        thumb.BorderColor = Color.FromArgb(28, 39, 63);
+        thumb.BackColor = row.FillColor;
+        row.Controls.Add(thumb);
+
+        var nameLabel = MakeLabel(name, 96, 5, 160, 20, 10F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, row.FillColor);
+        row.Controls.Add(nameLabel);
+        if (selected)
+        {
+            row.Controls.Add(NewPill("UPDATE", 166, 7, 54, 20, Color.FromArgb(83, 47, 14)));
+        }
+
+        var authorLabel = MakeLabel($"by {author} \u00B7 {category}", 96, 24, 194, 18, 8.2F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, row.FillColor);
+        row.Controls.Add(authorLabel);
+        var versionLabel = MakeLabel(version, 328, 10, 70, 22, 9F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, row.FillColor);
+        versionLabel.Font = new Font("Consolas", 9F, FontStyle.Regular);
+        row.Controls.Add(versionLabel);
+
+        var toggle = new ToggleSwitch
+        {
+            Left = 408,
+            Top = 12,
+            Width = 38,
+            Height = 21,
+            BackColor = row.FillColor,
+            Checked = enabled,
+            OnColor = Color.FromArgb(46, 126, 79),
+            OnColor2 = Color.FromArgb(92, 217, 138),
+            OffColor = Color.FromArgb(29, 38, 61),
+            OffColor2 = Color.FromArgb(72, 83, 122)
+        };
+        row.Controls.Add(toggle);
+        var menuLabel = MakeLabel("\u22EE", 466, 10, 18, 24, 12F, FontStyle.Bold, TextDim, ContentAlignment.MiddleCenter, row.FillColor);
+        row.Controls.Add(menuLabel);
+        row.Resize += (_, _) =>
+        {
+            versionLabel.Left = Math.Max(300, row.Width - 170);
+            toggle.Left = Math.Max(380, row.Width - 90);
+            menuLabel.Left = Math.Max(450, row.Width - 32);
+            nameLabel.Width = Math.Max(150, versionLabel.Left - nameLabel.Left - 18);
+            authorLabel.Width = nameLabel.Width;
+        };
+        return row;
+    }
+
+    private RoundedPanel BuildModDetailsPane(int x, int y)
+    {
+        var details = NewPanel(12, x, y, 310, 466);
+        details.FillColor = Color.FromArgb(10, 16, 31);
+        details.BorderColor = Color.FromArgb(18, 28, 47);
+
+        details.Controls.Add(MakeLabel("MOD DETAILS", 18, 16, 160, 22, 9F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, details.FillColor));
+        details.Controls.Add(Line(14, 44, 282));
+        var thumb = NewPanel(8, 18, 62, 56, 56);
+        thumb.FillColor = Color.FromArgb(19, 27, 45);
+        thumb.BorderColor = Color.FromArgb(28, 39, 63);
+        thumb.BackColor = details.FillColor;
+        details.Controls.Add(thumb);
+
+        details.Controls.Add(MakeLabel("Quick Stack", 92, 62, 180, 26, 13F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, details.FillColor));
+        details.Controls.Add(MakeLabel("by ToolboxModding", 92, 86, 180, 18, 8.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, details.FillColor));
+        details.Controls.Add(MakeLabel("QoL", 92, 104, 70, 18, 8F, FontStyle.Regular, PurpleLight, ContentAlignment.MiddleLeft, details.FillColor));
+
+        var update = NewPanel(8, 18, 128, 274, 40);
+        update.FillColor = Color.FromArgb(39, 32, 29);
+        update.BorderColor = Color.FromArgb(77, 59, 39);
+        update.BackColor = details.FillColor;
+        update.Controls.Add(MakeLabel("Update available: 1.0.0", 14, 10, 150, 20, 9F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, update.FillColor));
+        var updateNow = MakeButton("Update now", 182, 7, 84, 26, () => ShowModsSubTab("Nexus Search"));
+        updateNow.FillColor = Amber;
+        updateNow.HoverColor = Color.FromArgb(255, 190, 84);
+        updateNow.BorderColor = Color.FromArgb(255, 198, 104);
+        updateNow.ForeColor = Color.FromArgb(20, 14, 8);
+        updateNow.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        update.Controls.Add(updateNow);
+        details.Controls.Add(update);
+
+        details.Controls.Add(BuildDetailStat("INSTALLED", "0.9.4", 18, 184));
+        details.Controls.Add(BuildDetailStat("SIZE", "0.4 MB", 162, 184));
+        details.Controls.Add(BuildDetailStat("ENDORSEMENTS", "18.2k", 18, 238));
+        details.Controls.Add(BuildDetailStat("STATUS", "Enabled", 162, 238, Green));
+
+        details.Controls.Add(MakeLabel("DESCRIPTION", 18, 288, 140, 18, 8F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, details.FillColor));
+        details.Controls.Add(MakeWrappedLabel("Adds a one-click deposit-all button to nearby storage and automatically sorts your inventory by type.", 18, 308, 260, 38, 8.6F, FontStyle.Regular, TextMuted, details.FillColor));
+        var disable = MakeButton("Disable", 18, 352, 132, 34, () => Log("Select a managed mod before changing status."));
+        disable.Enabled = false;
+        details.Controls.Add(disable);
+        var remove = MakeButton("Remove mod", 164, 352, 128, 34, () => Log("Select a managed mod before removing it."));
+        remove.Enabled = false;
+        remove.FillColor = Color.FromArgb(14, 16, 26);
+        remove.HoverColor = Color.FromArgb(42, 18, 27);
+        remove.BorderColor = Color.FromArgb(80, 35, 43);
+        remove.ForeColor = Color.FromArgb(240, 96, 106);
+        details.Controls.Add(remove);
+        return details;
+    }
+
+    private static RoundedPanel BuildDetailStat(string title, string value, int x, int y, Color? valueColor = null)
+    {
+        var card = NewPanel(8, x, y, 130, 48);
+        card.FillColor = Color.FromArgb(7, 12, 23);
+        card.BorderColor = Color.FromArgb(16, 26, 43);
+        card.BackColor = Color.FromArgb(10, 16, 31);
+        card.Controls.Add(MakeLabel(title, 12, 7, 100, 14, 7.5F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, card.FillColor));
+        var valueLabel = MakeLabel(value, 12, 24, 100, 18, 10F, FontStyle.Bold, valueColor ?? TextMuted, ContentAlignment.MiddleLeft, card.FillColor);
+        valueLabel.Font = new Font("Consolas", 10F, FontStyle.Bold);
+        card.Controls.Add(valueLabel);
+        return card;
+    }
+
+    private RoundedPanel BuildNexusSearchPane()
+    {
+        var panel = NewPanel(12, 0, 0, 826, 508);
+        panel.FillColor = Color.FromArgb(10, 16, 31);
+        panel.BorderColor = Color.FromArgb(18, 28, 47);
+        panel.Controls.Add(MakeLabel("Nexus Search", 24, 24, 240, 28, 16F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, panel.FillColor));
+        panel.Controls.Add(MakeLabel("Search and install support will appear here.", 24, 60, 420, 24, 10F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, panel.FillColor));
+        return panel;
+    }
+
+    private RoundedPanel BuildScriptsTab()
+    {
+        var panel = NewPanel(0, 0, 0, 1020, 690);
+        panel.BorderColor = AppBack;
+        panel.FillColor = AppBack;
+
+        panel.Controls.Add(MakeLabel("Scripts", 0, 0, 130, 42, 23, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
+        panel.Controls.Add(NewPill("EXPERIMENTAL", 142, 10, 118, 28, Color.FromArgb(35, 21, 67)));
+        panel.Controls.Add(MakeLabel("Community automation for your server -- scheduled tasks, webhooks and custom hooks.", 2, 48, 780, 28, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
+
+        var newScript = MakeButton("+ New Script", 886, 8, 130, 42, OpenConfigFolder, main: true);
+        newScript.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+        panel.Controls.Add(newScript);
+
+        var filterBar = NewPanel(10, 0, 92, 998, 58);
+        filterBar.FillColor = PanelBack;
+        filterBar.BorderColor = BorderSoft;
+        panel.Controls.Add(filterBar);
+        AddScriptFilterTab(filterBar, "All Scripts", 28, selected: true);
+        AddScriptFilterTab(filterBar, "Scheduled", 146, selected: false);
+        AddScriptFilterTab(filterBar, "Webhooks", 282, selected: false);
+        AddScriptFilterTab(filterBar, "Custom", 418, selected: false);
+
+        panel.Controls.Add(BuildScriptCard(
+            "Scheduled Restart",
+            "Batch - Every 6 hours",
+            "Gracefully warns players, saves the world and restarts the server process on a fixed interval to clear memory.",
+            "Active",
+            "\u23F1",
+            enabled: true,
+            x: 14,
+            y: 172));
+
+        panel.Controls.Add(BuildScriptCard(
+            "Discord Status Webhook",
+            "Lua - On player join/leave",
+            "Posts live player count, server status and join notifications to a configured Discord channel.",
+            "Active",
+            "\uD83D\uDD14",
+            enabled: true,
+            x: 520,
+            y: 172));
+
+        panel.Controls.Add(BuildScriptCard(
+            "Nightly Backup",
+            "PowerShell - Daily at 04:00",
+            "Zips the save folder and config files to a timestamped archive, keeping the last 14 days of backups.",
+            "Paused",
+            "\uD83D\uDCBE",
+            enabled: false,
+            x: 14,
+            y: 390));
+
+        panel.Controls.Add(BuildCustomScriptDropZone(520, 390));
+
+        var notice = NewPanel(10, 0, 622, 998, 54);
+        notice.FillColor = Color.FromArgb(13, 14, 35);
+        notice.BorderColor = Color.FromArgb(37, 28, 86);
+        var noticeIcon = MakeLabel("\uE946", 20, 13, 28, 28, 14, FontStyle.Regular, Color.FromArgb(255, 219, 76), ContentAlignment.MiddleCenter, notice.FillColor);
+        noticeIcon.Font = new Font("Segoe MDL2 Assets", 14F, FontStyle.Regular);
+        notice.Controls.Add(noticeIcon);
+        notice.Controls.Add(MakeLabel("Scripts run inside a sandbox with access to RCON and the server API. Review community scripts before enabling them on a live server.", 58, 14, 900, 26, 10.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, notice.FillColor));
+        panel.Controls.Add(notice);
+
+        return panel;
+    }
+
+    private static void AddScriptFilterTab(Control parent, string text, int x, bool selected)
+    {
+        var width = text switch
+        {
+            "All Scripts" => 96,
+            "Scheduled" => 110,
+            _ => 104
+        };
+        var label = MakeLabel(text, x, 12, width, 32, 10.5F, FontStyle.Bold, selected ? TextMain : TextDim, ContentAlignment.MiddleCenter, PanelBack);
+        parent.Controls.Add(label);
+
+        if (!selected) return;
+
+        var underline = new Panel
+        {
+            Left = x + 8,
+            Top = 50,
+            Width = width - 16,
+            Height = 3,
+            BackColor = PurpleLight
+        };
+        parent.Controls.Add(underline);
+    }
+
+    private RoundedPanel BuildScriptCard(string title, string subtitle, string description, string status, string icon, bool enabled, int x, int y)
+    {
+        var card = NewPanel(12, x, y, 476, 172);
+        card.FillColor = Color.FromArgb(11, 18, 34);
+        card.BorderColor = BorderSoft;
+
+        var iconBox = NewPanel(8, 24, 22, 54, 54);
+        iconBox.FillColor = Color.FromArgb(16, 23, 43);
+        iconBox.BorderColor = Color.FromArgb(38, 43, 84);
+        iconBox.BackColor = card.FillColor;
+        var iconLabel = MakeLabel(icon, 0, 0, 54, 54, 20, FontStyle.Regular, enabled ? TextMain : TextMuted, ContentAlignment.MiddleCenter, iconBox.FillColor);
+        iconLabel.Font = new Font("Segoe UI Emoji", 20F, FontStyle.Regular);
+        iconBox.Controls.Add(iconLabel);
+        card.Controls.Add(iconBox);
+
+        card.Controls.Add(MakeLabel(title, 96, 22, 280, 26, 12.5F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, card.FillColor));
+        card.Controls.Add(MakeLabel(subtitle, 96, 48, 280, 22, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, card.FillColor));
+
+        var toggle = new ToggleSwitch
+        {
+            Left = 394,
+            Top = 26,
+            Width = 50,
+            Height = 26,
+            BackColor = card.FillColor,
+            Checked = enabled,
+            OnColor = Color.FromArgb(8, 84, 54),
+            OnColor2 = Color.FromArgb(18, 186, 104),
+            OffColor = Color.FromArgb(38, 45, 73),
+            OffColor2 = Color.FromArgb(72, 83, 122)
+        };
+        card.Controls.Add(toggle);
+
+        card.Controls.Add(MakeWrappedLabel(description, 24, 92, 420, 44, 10.5F, FontStyle.Regular, TextMuted, card.FillColor));
+        card.Controls.Add(Line(24, 144, 420));
+        card.Controls.Add(MakeLabel(status == "Active" ? "Active" : "Paused", 24, 148, 100, 20, 9.5F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, card.FillColor));
+        card.Controls.Add(MakeLabel("Edit", 350, 148, 44, 20, 9.5F, FontStyle.Bold, PurpleLight, ContentAlignment.MiddleLeft, card.FillColor));
+        card.Controls.Add(MakeLabel("Run now", 400, 148, 72, 20, 9.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, card.FillColor));
+        return card;
+    }
+
+    private RoundedPanel BuildCustomScriptDropZone(int x, int y)
+    {
+        var zone = NewPanel(12, x, y, 476, 172);
+        zone.FillColor = AppBack;
+        zone.BorderColor = Color.FromArgb(55, 42, 108);
+        var plus = NewPanel(8, 204, 42, 46, 46);
+        plus.FillColor = InnerBack;
+        plus.BorderColor = Color.FromArgb(60, 48, 126);
+        plus.BackColor = zone.FillColor;
+        plus.Controls.Add(MakeLabel("+", 0, 0, 46, 46, 21, FontStyle.Regular, PurpleLight, ContentAlignment.MiddleCenter, plus.FillColor));
+        zone.Controls.Add(plus);
+        zone.Controls.Add(MakeLabel("Add a custom script", 0, 104, 476, 24, 11, FontStyle.Bold, TextMuted, ContentAlignment.MiddleCenter, zone.FillColor));
+        zone.Controls.Add(MakeLabel("Lua, Batch or PowerShell", 0, 130, 476, 22, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, zone.FillColor));
+        return zone;
     }
 
     private RoundedPanel BuildSetupTab()
@@ -1237,8 +1860,7 @@ public sealed partial class MainForm : Form
         {
             BackColor = PanelBack,
             AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18),
-            AutoScrollMinSize = new Size(932, 0)
+            AutoScrollMargin = new Size(0, 18)
         };
         _serverModePanel = new Panel
         {
@@ -1260,13 +1882,7 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerManagementPage()
     {
-        var page = new Panel
-        {
-            BackColor = PanelBack,
-            AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18),
-            AutoScrollMinSize = new Size(932, 0)
-        };
+        var page = new Panel { BackColor = PanelBack };
         _serverManagementPane = page;
 
         var windows = NewServerSection("Windows Server Management", 0, 0, 456, 200);
@@ -1295,13 +1911,7 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerBackupsPage()
     {
-        var page = new Panel
-        {
-            BackColor = PanelBack,
-            AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18),
-            AutoScrollMinSize = new Size(932, 0)
-        };
+        var page = new Panel { BackColor = PanelBack };
         _serverBackupsPane = page;
         var section = NewServerSection("Backups", 0, 0, 456, 244);
         page.Controls.Add(section);
@@ -1335,8 +1945,7 @@ public sealed partial class MainForm : Form
         {
             BackColor = PanelBack,
             AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18),
-            AutoScrollMinSize = new Size(932, 0)
+            AutoScrollMargin = new Size(0, 18)
         };
 
         var approved = NewServerSection("Approved Mod List", 0, 0, 456, 286);
@@ -1403,13 +2012,7 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerLogsPage()
     {
-        var page = new Panel
-        {
-            BackColor = PanelBack,
-            AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18),
-            AutoScrollMinSize = new Size(932, 0)
-        };
+        var page = new Panel { BackColor = PanelBack };
         _serverLogsPane = page;
         var section = NewServerSection("Logs", 0, 0, 932, 286);
         section.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -1442,13 +2045,7 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerIntegrationsPage()
     {
-        var page = new Panel
-        {
-            BackColor = PanelBack,
-            AutoScroll = true,
-            AutoScrollMargin = new Size(0, 18),
-            AutoScrollMinSize = new Size(932, 0)
-        };
+        var page = new Panel { BackColor = PanelBack };
         _serverIntegrationsPane = page;
         _linuxHelperPanel = BuildLinuxHelperSection();
         _linuxHelperPanel.Left = 0;
@@ -2570,52 +3167,24 @@ public sealed partial class MainForm : Form
 
     private void AutoDetectPaths(bool log)
     {
-        var savedGameFolder = _gameFolderBox.Text.Trim();
-        var savedModFolder = _modFolderBox.Text.Trim();
-        var hasSavedGameFolder = IsValidGameFolder(savedGameFolder);
-        var hasSavedModFolder = LuaModService.IsValidModFolder(savedModFolder);
-
-        if (hasSavedGameFolder)
-        {
-            var modFolder = hasSavedModFolder
-                ? savedModFolder
-                : LuaModService.DetectModFolder(savedGameFolder) ?? LuaModService.GetExpectedModFolder(savedGameFolder);
-            _gameFolderBox.Text = savedGameFolder;
-            _modFolderBox.Text = modFolder;
-
-            TryInstallBundledMod(savedGameFolder, modFolder, log);
-
-            if (log) Log("Using saved VEIN path: " + savedGameFolder);
-            if (log) Log("Using mod path: " + modFolder);
-            SavePathSettings();
-            LoadModFromPath(loadExistingState: true);
-            UpdateStatuses();
-            return;
-        }
-
         var gameFolder = LuaModService.DetectGameFolder();
         if (!string.IsNullOrWhiteSpace(gameFolder))
         {
             _gameFolderBox.Text = gameFolder;
-            var modFolder = hasSavedModFolder
-                ? savedModFolder
-                : LuaModService.DetectModFolder(gameFolder) ?? LuaModService.GetExpectedModFolder(gameFolder);
+            var modFolder = LuaModService.DetectModFolder(gameFolder) ?? LuaModService.GetExpectedModFolder(gameFolder);
             _modFolderBox.Text = modFolder;
 
             TryInstallBundledMod(gameFolder, modFolder, log);
 
             if (log) Log("Detected VEIN path: " + gameFolder);
-            if (log) Log("Using mod path: " + modFolder);
+            if (log) Log("Detected mod path: " + modFolder);
             LoadModFromPath(loadExistingState: true);
         }
         else if (log)
         {
-            Log(hasSavedModFolder
-                ? "VEIN path was not auto-detected. Keeping the saved mod folder."
-                : "VEIN path was not auto-detected. Use Browse.");
+            Log("VEIN path was not auto-detected. Use Browse.");
         }
 
-        SavePathSettings();
         UpdateStatuses();
     }
 
@@ -2627,7 +3196,6 @@ public sealed partial class MainForm : Form
         var expected = LuaModService.DetectModFolder(dlg.SelectedPath) ?? LuaModService.GetExpectedModFolder(dlg.SelectedPath);
         _modFolderBox.Text = expected;
         TryInstallBundledMod(dlg.SelectedPath, expected, log: true);
-        SavePathSettings();
         LoadModFromPath(loadExistingState: true);
         MarkUnsaved(false);
         Log("Selected VEIN path: " + dlg.SelectedPath);
@@ -2655,102 +3223,12 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void LoadPathSettings()
-    {
-        var path = GetLocalSettingsPath();
-        if (path == null || !File.Exists(path)) return;
-
-        try
-        {
-            var settings = JsonSerializer.Deserialize<LocalPathSettings>(File.ReadAllText(path));
-            if (settings == null) return;
-
-            var gameFolder = settings.GameFolder;
-            if (!string.IsNullOrWhiteSpace(gameFolder) && IsValidGameFolder(gameFolder))
-            {
-                _gameFolderBox.Text = gameFolder;
-            }
-
-            var modFolder = settings.ModFolder;
-            if (!string.IsNullOrWhiteSpace(modFolder) && LuaModService.IsValidModFolder(modFolder))
-            {
-                _modFolderBox.Text = modFolder;
-            }
-        }
-        catch (Exception ex)
-        {
-            LogError("Saved path settings could not be loaded. Auto Detect will be used instead. " + ex.Message);
-        }
-    }
-
-    private void SavePathSettings()
-    {
-        var path = GetLocalSettingsPath();
-        if (path == null) return;
-
-        try
-        {
-            var settings = new LocalPathSettings
-            {
-                GameFolder = _gameFolderBox.Text.Trim(),
-                ModFolder = _modFolderBox.Text.Trim()
-            };
-            WriteTextAtomic(path, JsonSerializer.Serialize(settings, SettingsJsonOptions));
-        }
-        catch (Exception ex)
-        {
-            LogError("Path settings could not be saved, but the app can continue. " + ex.Message);
-        }
-    }
-
-    private static string? GetLocalSettingsPath()
-    {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return string.IsNullOrWhiteSpace(localAppData)
-            ? null
-            : Path.Combine(localAppData, SettingsDirectoryName, SettingsFileName);
-    }
-
-    private static void WriteTextAtomic(string path, string content)
-    {
-        var directory = Path.GetDirectoryName(path) ?? ".";
-        Directory.CreateDirectory(directory);
-        var tempPath = Path.Combine(directory, Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
-
-        try
-        {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
-            using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
-            {
-                writer.Write(content);
-                writer.Flush();
-                stream.Flush(flushToDisk: true);
-            }
-
-            if (File.Exists(path)) File.Replace(tempPath, path, null);
-            else File.Move(tempPath, path);
-        }
-        finally
-        {
-            if (File.Exists(tempPath)) File.Delete(tempPath);
-        }
-    }
-
-    private static bool IsValidGameFolder(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return false;
-        return File.Exists(Path.Combine(path, "Vein", "Binaries", "Win64", "Vein-Win64-Test.exe"))
-            || File.Exists(Path.Combine(path, "Vein", "Binaries", "Win64", "Vein.exe"))
-            || Directory.Exists(Path.Combine(path, "Vein", "Content", "Paks"));
-    }
-
     private void BrowseModFolder()
     {
         using var dlg = new FolderBrowserDialog { Description = "Select ItemAndContainerModifier folder" };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
         _modFolderBox.Text = dlg.SelectedPath;
         LoadModFromPath(loadExistingState: true);
-        SavePathSettings();
         Log("Selected mod folder: " + dlg.SelectedPath);
     }
 
@@ -2759,15 +3237,8 @@ public sealed partial class MainForm : Form
         var path = _modFolderBox.Text.Trim();
         if (Directory.Exists(path))
         {
-            try
-            {
-                using var process = Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
-                Log("Opened mod folder.");
-            }
-            catch (Exception ex)
-            {
-                LogError("Could not open mod folder: " + ex.Message);
-            }
+            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            Log("Opened mod folder.");
         }
         else
         {
@@ -2809,7 +3280,6 @@ public sealed partial class MainForm : Form
             Log(markUnsaved
                 ? $"Imported {editCount} generated edits into the editor."
                 : $"Loaded {editCount} generated edits from the current mod folder.");
-            SavePathSettings();
             return true;
         }
         catch (Exception ex)
@@ -2852,7 +3322,6 @@ public sealed partial class MainForm : Form
             Log("Backup created: " + install.BackupPath);
             Log("Installed ui_config.lua to: " + install.InstalledPath);
             LoadModFromPath(loadExistingState: true);
-            SavePathSettings();
         }
         catch (Exception ex)
         {
@@ -2899,15 +3368,8 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo { FileName = scripts, UseShellExecute = true });
-            Log("Opened config folder.");
-        }
-        catch (Exception ex)
-        {
-            LogError("Could not open config folder: " + ex.Message);
-        }
+        Process.Start(new ProcessStartInfo { FileName = scripts, UseShellExecute = true });
+        Log("Opened config folder.");
     }
 
     private void ConfigImport_DragEnter(object? sender, DragEventArgs e)
@@ -3011,33 +3473,12 @@ public sealed partial class MainForm : Form
 
     private void SaveConfig()
     {
-        _ = TrySaveConfig();
-    }
-
-    private bool TrySaveConfig()
-    {
         LoadModFromPath(loadExistingState: false);
         var modFolder = _modFolderBox.Text.Trim();
         if (!LuaModService.IsValidModFolder(modFolder))
         {
-            LogError("Cannot save. Select a valid ItemAndContainerModifier folder first.");
-            return false;
-        }
-
-        if (IsGameRunning())
-        {
-            var result = MessageBox.Show(
-                this,
-                "VEIN appears to be running. Save anyway, then restart the game for changes to apply?",
-                "VEIN is running",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2);
-            if (result != DialogResult.Yes)
-            {
-                Log("Save canceled because VEIN is running.");
-                return false;
-            }
+            LogError("Cannot save. Select the ItemAndContainerModifier folder first.");
+            return;
         }
 
         try
@@ -3048,15 +3489,12 @@ public sealed partial class MainForm : Form
             LuaModService.ApplyConfig(modFolder, _state);
             _lastConfigSaveAt = DateTime.Now;
             MarkUnsaved(false);
-            SavePathSettings();
             Log("Config saved. Restart VEIN if the game is open.");
             LoadModFromPath(loadExistingState: true);
-            return !_hasUnsavedChanges;
         }
         catch (Exception ex)
         {
-            LogError("Save failed. Your unsaved changes are still open in the editor. " + ex.Message);
-            return false;
+            LogError("Save failed: " + ex.Message);
         }
     }
 
@@ -3085,7 +3523,7 @@ public sealed partial class MainForm : Form
     {
         try
         {
-            using var process = LuaModService.LaunchVein(_gameFolderBox.Text.Trim());
+            var process = LuaModService.LaunchVein(_gameFolderBox.Text.Trim());
             Log(process == null ? "VEIN executable was not found." : "Launched VEIN.");
         }
         catch (Exception ex)
@@ -3100,14 +3538,12 @@ public sealed partial class MainForm : Form
         if (category == null) return;
 
         var values = new Dictionary<string, LuaValue>(StringComparer.OrdinalIgnoreCase);
-        var inputsValid = true;
-        inputsValid &= AddCategoryNumber(values, "Weight");
-        inputsValid &= AddCategoryNumber(values, "MaxStack", allowNegative: false);
+        AddCategoryNumber(values, "Weight");
+        AddCategoryNumber(values, "MaxStack", allowNegative: false);
         AddCategoryBool(values, "bStackable");
-        inputsValid &= AddCategoryNumber(values, "MaxWeight");
-        inputsValid &= AddCategoryNumber(values, "ExtraWeightCapacity");
-        inputsValid &= AddCategoryNumber(values, "RunSpeedMultiplier");
-        if (!inputsValid) return;
+        AddCategoryNumber(values, "MaxWeight");
+        AddCategoryNumber(values, "ExtraWeightCapacity");
+        AddCategoryNumber(values, "RunSpeedMultiplier");
 
         _state.EnabledCategories[category] = _categoryEnabled.Checked;
         if (values.Count == 0) _state.CategoryDefaults.Remove(category);
@@ -3149,22 +3585,19 @@ public sealed partial class MainForm : Form
             {
                 if (_state.ContainerWeightOverrides.TryGetValue(item.Category, out var existing)) existing.Remove(item.ClassName);
             }
-            else
+            else if (ReadItemNumber("MaxWeight", "Max Weight", out var maxWeight))
             {
-                if (!ReadItemNumber("MaxWeight", "Max Weight", out var maxWeight, out var hasMaxWeight)) return;
-                if (hasMaxWeight) GetContainerOverrides(item.Category)[item.ClassName] = maxWeight;
+                GetContainerOverrides(item.Category)[item.ClassName] = maxWeight;
             }
         }
         else
         {
             var values = new Dictionary<string, LuaValue>(StringComparer.OrdinalIgnoreCase);
-            var inputsValid = true;
-            inputsValid &= AddItemNumber(values, "Weight", "Weight");
-            inputsValid &= AddItemNumber(values, "MaxStack", "Max Stack", allowNegative: false);
+            AddItemNumber(values, "Weight", "Weight");
+            AddItemNumber(values, "MaxStack", "Max Stack", allowNegative: false);
             AddItemBool(values, "bStackable");
-            inputsValid &= AddItemNumber(values, "ExtraWeightCapacity", "Extra Weight Capacity");
-            inputsValid &= AddItemNumber(values, "RunSpeedMultiplier", "Run Speed Multiplier");
-            if (!inputsValid) return;
+            AddItemNumber(values, "ExtraWeightCapacity", "Extra Weight Capacity");
+            AddItemNumber(values, "RunSpeedMultiplier", "Run Speed Multiplier");
 
             if (values.Count == 0)
             {
@@ -3202,31 +3635,11 @@ public sealed partial class MainForm : Form
         UpdateStatuses();
     }
 
-    private void ClearDynamicFieldControls(Control parent)
-    {
-        foreach (Control control in parent.Controls.Cast<Control>().ToArray())
-        {
-            ClearToolTipTree(control);
-            control.Dispose();
-        }
-
-        parent.Controls.Clear();
-    }
-
-    private void ClearToolTipTree(Control control)
-    {
-        _toolTip.SetToolTip(control, null);
-        foreach (Control child in control.Controls)
-        {
-            ClearToolTipTree(child);
-        }
-    }
-
     private void RefreshCategoryEditor()
     {
         if (_categoryCombo == null || _categoryFields == null) return;
         var category = CurrentCategory();
-        ClearDynamicFieldControls(_categoryFields);
+        _categoryFields.Controls.Clear();
         _categoryInputs.Clear();
 
         if (string.IsNullOrWhiteSpace(category))
@@ -3290,7 +3703,7 @@ public sealed partial class MainForm : Form
         try
         {
             var item = CurrentItem();
-            ClearDynamicFieldControls(_itemFields);
+            _itemFields.Controls.Clear();
             _itemInputs.Clear();
 
             if (item == null)
@@ -3398,38 +3811,11 @@ public sealed partial class MainForm : Form
         UpdateStatuses();
     }
 
-    private static bool IsGameRunning()
-    {
-        return IsAnyProcessRunning(
-            "Vein-Win64-Test",
-            "Vein",
-            "Vein-Win64-Shipping");
-    }
-
-    private static bool IsAnyProcessRunning(params string[] processNames)
-    {
-        foreach (var processName in processNames)
-        {
-            var processes = Process.GetProcessesByName(processName);
-            try
-            {
-                if (processes.Length > 0) return true;
-            }
-            finally
-            {
-                foreach (var process in processes)
-                {
-                    process.Dispose();
-                }
-            }
-        }
-
-        return false;
-    }
-
     private void UpdateStatuses()
     {
-        var gameRunning = IsGameRunning();
+        var gameRunning = Process.GetProcessesByName("Vein-Win64-Test").Length > 0
+            || Process.GetProcessesByName("Vein").Length > 0
+            || Process.GetProcessesByName("Vein-Win64-Shipping").Length > 0;
         _gameStatus.Text = gameRunning ? "Open" : "Closed";
         _gameStatus.ForeColor = gameRunning ? Green : Orange;
 
@@ -3567,8 +3953,8 @@ public sealed partial class MainForm : Form
         var field = NewFieldPanel(label, 250, 96);
         field.Margin = new Padding(0, 0, 18, 10);
         Control input = kind == FieldKind.Bool
-            ? NewCombo(14, 40, 220, BoolChoices)
-            : NewNumberTextBox(14, 40, 220, 36);
+            ? NewCombo(20, 48, 210, BoolChoices)
+            : NewNumberTextBox(20, 50, 210, 34);
         AddTip(input, kind == FieldKind.Bool
             ? $"Choose a category-wide default for {label}, or leave Game Default."
             : $"Enter a category-wide number for {label}, or leave blank for game default.");
@@ -3588,8 +3974,8 @@ public sealed partial class MainForm : Form
         check.BackColor = InnerBack;
         AddTip(check, "Leave checked to keep the game's value. Uncheck to type a generated override.");
         Control input = kind == FieldKind.Bool
-            ? NewCombo(25, 64, 220, BoolChoices)
-            : NewNumberTextBox(25, 68, 220, 28);
+            ? NewCombo(25, 68, 200, BoolChoices)
+            : NewNumberTextBox(25, 70, 200, 34);
         AddTip(input, kind == FieldKind.Bool
             ? $"Choose an override for {label}, or keep Game Default."
             : $"Type the {label} override for this one item.");
@@ -3615,12 +4001,10 @@ public sealed partial class MainForm : Form
         field.Height = editMode ? 112 : 82;
     }
 
-    private bool AddCategoryNumber(Dictionary<string, LuaValue> values, string key, bool allowNegative = true)
+    private void AddCategoryNumber(Dictionary<string, LuaValue> values, string key, bool allowNegative = true)
     {
-        if (!_categoryInputs.TryGetValue(key, out var input) || input is not TextBox box) return true;
-        if (!TryReadOptionalNumber(box.Text, key, out var value, out var hasValue, allowNegative)) return false;
-        if (hasValue) values[key] = value;
-        return true;
+        if (!_categoryInputs.TryGetValue(key, out var input) || input is not TextBox box) return;
+        if (TryReadOptionalNumber(box.Text, key, out var value, allowNegative)) values[key] = value;
     }
 
     private void AddCategoryBool(Dictionary<string, LuaValue> values, string key)
@@ -3630,11 +4014,9 @@ public sealed partial class MainForm : Form
         if (!value.IsNil) values[key] = value;
     }
 
-    private bool AddItemNumber(Dictionary<string, LuaValue> values, string key, string label, bool allowNegative = true)
+    private void AddItemNumber(Dictionary<string, LuaValue> values, string key, string label, bool allowNegative = true)
     {
-        if (!ReadItemNumber(key, label, out var value, out var hasValue, allowNegative)) return false;
-        if (hasValue) values[key] = value;
-        return true;
+        if (ReadItemNumber(key, label, out var value, allowNegative)) values[key] = value;
     }
 
     private void AddItemBool(Dictionary<string, LuaValue> values, string key)
@@ -3644,28 +4026,18 @@ public sealed partial class MainForm : Form
         if (!value.IsNil) values[key] = value;
     }
 
-    private bool ReadItemNumber(string key, string label, out LuaValue value, out bool hasValue, bool allowNegative = true)
+    private bool ReadItemNumber(string key, string label, out LuaValue value, bool allowNegative = true)
     {
         value = LuaValue.Nil;
-        hasValue = false;
-        if (!_itemInputs.TryGetValue(key, out var field) || field.DefaultCheck.Checked || field.Input is not TextBox box) return true;
-
-        var raw = box.Text.Trim();
-        if (string.IsNullOrWhiteSpace(raw) || raw.Equals("nil", StringComparison.OrdinalIgnoreCase))
-        {
-            LogError(label + " must be a number or check Use Game Default.");
-            return false;
-        }
-
-        return TryReadOptionalNumber(raw, label, out value, out hasValue, allowNegative);
+        if (!_itemInputs.TryGetValue(key, out var field) || field.DefaultCheck.Checked || field.Input is not TextBox box) return false;
+        return TryReadOptionalNumber(box.Text, label, out value, allowNegative);
     }
 
-    private bool TryReadOptionalNumber(string raw, string label, out LuaValue value, out bool hasValue, bool allowNegative = true)
+    private bool TryReadOptionalNumber(string raw, string label, out LuaValue value, bool allowNegative = true)
     {
         value = LuaValue.Nil;
-        hasValue = false;
         raw = raw.Trim();
-        if (string.IsNullOrWhiteSpace(raw) || raw.Equals("nil", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.IsNullOrWhiteSpace(raw) || raw.Equals("nil", StringComparison.OrdinalIgnoreCase)) return false;
 
         if (!decimal.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
         {
@@ -3681,7 +4053,6 @@ public sealed partial class MainForm : Form
 
         if (number >= 999999) Log(label + " is massive. Allowed for private testing.");
         value = new LuaValue(number);
-        hasValue = true;
         return true;
     }
 
@@ -3755,14 +4126,11 @@ public sealed partial class MainForm : Form
 
     private void AppendLog(string msg, Color color)
     {
-        msg = RedactUserProfile(msg);
         var line = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " | " + msg + Environment.NewLine;
         _log.SelectionStart = _log.TextLength;
         _log.SelectionColor = color;
         _log.AppendText(line);
         _log.SelectionColor = _log.ForeColor;
-        TrimLog();
-        _log.SelectionStart = _log.TextLength;
         _log.ScrollToCaret();
         TrackRecentActivity(line.TrimEnd());
     }
@@ -3778,33 +4146,9 @@ public sealed partial class MainForm : Form
         RefreshDashboard();
     }
 
-    private void TrimLog()
-    {
-        var lineCount = _log.Lines.Length;
-        if (lineCount <= MaxLogLines) return;
-
-        var firstCharToKeep = _log.GetFirstCharIndexFromLine(lineCount - MaxLogLines);
-        if (firstCharToKeep <= 0) return;
-
-        _log.Select(0, firstCharToKeep);
-        _log.SelectedText = "";
-    }
-
-    private static string RedactUserProfile(string text)
-    {
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return string.IsNullOrWhiteSpace(profile)
-            ? text
-            : text.Replace(profile, "~", StringComparison.OrdinalIgnoreCase);
-    }
-
     private static RoundedPanel NewContentPanel()
     {
-        var panel = NewPanel(12, 0, 0, 1020, 512);
-        panel.AutoScroll = true;
-        panel.AutoScrollMargin = new Size(0, 16);
-        panel.AutoScrollMinSize = new Size(0, 512);
-        return panel;
+        return NewPanel(12, 0, 0, 1020, 512);
     }
 
     private static FlowLayoutPanel NewFieldFlow(int x, int y, int w, int h)
@@ -4005,12 +4349,14 @@ public sealed partial class MainForm : Form
     private static RoundedPanel NewStatCard(string title, string value, string sub, Color valueColor, int x, int y, int w, int h)
     {
         var panel = NewPanel(12, x, y, w, h);
-        const int textLeft = 20;
-        const int valueLeft = 16;
-        panel.Controls.Add(MakeLabel(title, textLeft, 12, w - 40, 20, 11, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        var valueLabel = MakeLabel(value, valueLeft, 28, w - 38, 30, 16, FontStyle.Regular, valueColor, ContentAlignment.MiddleLeft, PanelBack);
+        panel.FillColor = Color.FromArgb(10, 17, 31);
+        panel.BorderColor = BorderSoft;
+        const int textLeft = 22;
+        const int valueLeft = 20;
+        panel.Controls.Add(MakeLabel(title, textLeft, 12, w - 44, 20, 10.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, panel.FillColor));
+        var valueLabel = MakeLabel(value, valueLeft, 30, w - 42, 30, 16, FontStyle.Regular, valueColor, ContentAlignment.MiddleLeft, panel.FillColor);
         panel.Controls.Add(valueLabel);
-        panel.Controls.Add(MakeLabel(sub, textLeft, 58, w - 40, 18, 8.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        panel.Controls.Add(MakeLabel(sub, textLeft, 60, w - 44, 18, 8.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, panel.FillColor));
         panel.Tag = valueLabel;
         return panel;
     }
@@ -4086,10 +4432,10 @@ public sealed partial class MainForm : Form
             Top = y,
             Width = w,
             Height = h,
-            Radius = 10,
-            FillColor = main ? Purple : Color.FromArgb(32, 49, 75),
-            HoverColor = main ? PurpleLight : Color.FromArgb(43, 65, 99),
-            BorderColor = Color.FromArgb(54, 78, 116),
+            Radius = 9,
+            FillColor = main ? Purple : Color.FromArgb(29, 44, 69),
+            HoverColor = main ? PurpleLight : Color.FromArgb(38, 57, 88),
+            BorderColor = main ? PurpleLight : Color.FromArgb(49, 70, 105),
             ForeColor = TextMain,
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             TabStop = false,
@@ -4106,7 +4452,7 @@ public sealed partial class MainForm : Form
             Top = y,
             Width = width,
             Height = 44,
-            Radius = 14,
+            Radius = 12,
             FillColor = InnerBack,
             HoverColor = Color.FromArgb(18, 31, 50),
             BorderColor = BorderSoft,
@@ -4121,19 +4467,33 @@ public sealed partial class MainForm : Form
         return new RoundedButton
         {
             Text = text,
-            Left = x,
+            Left = 12,
             Top = y,
-            Width = 136,
-            Height = 44,
-            Radius = 12,
+            Width = SidebarWidth - 24,
+            Height = 46,
+            Radius = 8,
             FillColor = InnerBack,
-            HoverColor = Color.FromArgb(18, 31, 50),
+            HoverColor = Color.FromArgb(15, 25, 43),
             BorderColor = BorderSoft,
             ForeColor = TextMain,
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            IconText = SidebarIconFor(text),
+            IconFont = new Font("Segoe MDL2 Assets", 12F, FontStyle.Regular),
+            ContentLeftPadding = 12,
+            IconTextGap = 6,
             FlatStyle = FlatStyle.Flat
         };
     }
+
+    private static string SidebarIconFor(string title) => title switch
+    {
+        "Dashboard" => "\uE80F",
+        "Setup" => "\uE90F",
+        "Server Manager" => "\uE968",
+        "Mods" => "\uE713",
+        "Log" => "\uE8FD",
+        _ => string.Empty
+    };
 
     private static void UseDarkTitleBar(IntPtr handle)
     {
@@ -4149,16 +4509,16 @@ public sealed partial class MainForm : Form
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
+
     private static readonly Regex LowerToUpperOrDigitPattern = new(@"(?<=[a-z])(?=[A-Z0-9])", RegexOptions.Compiled);
     private static readonly Regex AcronymBoundaryPattern = new(@"(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.Compiled);
     private static readonly Regex NumberBoundaryPattern = new(@"(?<=\D)(?=\d)", RegexOptions.Compiled);
     private static readonly Regex WhitespacePattern = new(@"\s+", RegexOptions.Compiled);
-
-    private sealed class LocalPathSettings
-    {
-        public string? GameFolder { get; set; }
-        public string? ModFolder { get; set; }
-    }
 
     private enum FieldKind
     {
