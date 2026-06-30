@@ -688,7 +688,7 @@ public sealed partial class MainForm : Form
         _sidebar.BorderColor = BorderSoft;
         Controls.Add(_sidebar);
 
-        var logo = new RoundedPanel
+        var logo = new RedGlowPanel
         {
             Left = 28,
             Top = 58,
@@ -697,10 +697,13 @@ public sealed partial class MainForm : Form
             Radius = 10,
             FillColor = SidebarBack,
             BorderColor = SidebarBack,
-            BackColor = SidebarBack
+            BackColor = SidebarBack,
+            GlowColor = Color.FromArgb(185, 24, 38)
         };
-        logo.Controls.Add(MakeLabel("VEIN", 0, 28, logo.Width, 62, 38F, FontStyle.Bold, Color.White, ContentAlignment.MiddleCenter, SidebarBack));
-        logo.Controls.Add(MakeLabel("MOD MANAGER", 0, 98, logo.Width, 28, 10F, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, SidebarBack));
+        logo.Controls.Add(MakeLabel("VEIN", 2, 16, logo.Width, 64, 39F, FontStyle.Bold, Color.FromArgb(180, 36, 48), ContentAlignment.MiddleCenter, SidebarBack));
+        logo.Controls.Add(MakeLabel("VEIN", 0, 12, logo.Width, 64, 39F, FontStyle.Bold, Color.White, ContentAlignment.MiddleCenter, SidebarBack));
+        logo.Controls.Add(MakeLabel("MOD MANAGER", 1, 92, logo.Width, 28, 10F, FontStyle.Bold, Color.FromArgb(150, 28, 38), ContentAlignment.MiddleCenter, SidebarBack));
+        logo.Controls.Add(MakeLabel("MOD MANAGER", 0, 90, logo.Width, 28, 10F, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, SidebarBack));
         _sidebar.Controls.Add(logo);
         _sidebar.Controls.Add(Line(20, 200, SidebarWidth - 40));
 
@@ -1289,7 +1292,7 @@ public sealed partial class MainForm : Form
         panel.BorderColor = AppBack;
         panel.FillColor = AppBack;
 
-        var experimental = NewPill("EXPERIMENTAL", 148, 34, 126, 30, Color.FromArgb(35, 24, 72));
+        var experimental = NewPill("EXPERIMENTAL", 148, 34, 142, 30, Color.FromArgb(35, 24, 72));
         experimental.BackColor = AppBack;
         experimental.Radius = 15;
         panel.Controls.Add(experimental);
@@ -1310,7 +1313,7 @@ public sealed partial class MainForm : Form
         AddScriptFilterTab(filterBar, "All Scripts", string.Empty, 28, selected: true);
         AddScriptFilterTab(filterBar, "Scheduled", "\uE916", 166, selected: false);
         AddScriptFilterTab(filterBar, "Webhooks", "\uE71B", 328, selected: false);
-        AddScriptFilterTab(filterBar, "Custom", "\uE943", 496, selected: false);
+        AddScriptFilterTab(filterBar, "Custom", "</>", 496, selected: false);
 
         var scheduledCard = BuildScriptCard(
             "Scheduled Restart",
@@ -1424,7 +1427,7 @@ public sealed partial class MainForm : Form
         {
             var tabBack = parent is RoundedPanel roundedParent ? roundedParent.FillColor : parent.BackColor;
             var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, tabBack);
-            iconLabel.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
+            iconLabel.Font = icon.Equals("</>", StringComparison.Ordinal) ? new Font("Segoe UI", 10F, FontStyle.Bold) : new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
             parent.Controls.Add(iconLabel);
         }
 
@@ -1453,6 +1456,7 @@ public sealed partial class MainForm : Form
 
         var iconBox = NewPanel(8, 28, 28, 64, 64);
         iconBox.FillColor = Color.FromArgb(16, 23, 43);
+        iconBox.BorderColor = Color.FromArgb(31, 38, 70);
         var iconColor = title.Equals("Discord Status Webhook", StringComparison.Ordinal) ? Color.FromArgb(255, 207, 64) : enabled ? TextMain : TextMuted;
         var iconLabel = MakeLabel(icon, 0, 0, 64, 64, 20, FontStyle.Regular, iconColor, ContentAlignment.MiddleCenter, iconBox.FillColor);
         iconBox.BackColor = card.FillColor;
@@ -1524,8 +1528,8 @@ public sealed partial class MainForm : Form
             BackColor = AppBack
         };
         var plus = NewPanel(8, 0, 52, 54, 54);
-        plus.FillColor = InnerBack;
-        plus.BorderColor = Color.FromArgb(60, 48, 126);
+        plus.FillColor = Color.FromArgb(9, 14, 28);
+        plus.BorderColor = Color.FromArgb(75, 55, 150);
         plus.BackColor = zone.FillColor;
         plus.Controls.Add(MakeLabel("+", 0, 0, 54, 54, 21, FontStyle.Regular, Color.FromArgb(147, 82, 255), ContentAlignment.MiddleCenter, plus.FillColor));
         var titleLabel = MakeLabel("Add a custom script", 0, 128, w, 24, 11, FontStyle.Bold, TextMuted, ContentAlignment.MiddleCenter, zone.FillColor);
@@ -4434,7 +4438,8 @@ public sealed partial class MainForm : Form
             BorderColor = PurpleLight,
             BackColor = PanelBack
         };
-        panel.Controls.Add(MakeLabel(text, 0, 0, w, h, 9, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, color));
+        var label = MakeLabel(text, 0, 0, w, h, 9, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, Color.Transparent);
+        panel.Controls.Add(label);
         return panel;
     }
 

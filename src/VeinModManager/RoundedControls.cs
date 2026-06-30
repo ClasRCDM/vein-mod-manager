@@ -63,7 +63,7 @@ public sealed class DashedRoundedPanel : RoundedPanel
         e.Graphics.Clear(VisualBackColor(Parent, BackColor));
         using var path = RoundedRect(new Rectangle(1, 1, Width - 3, Height - 3), Radius);
         using var fill = new SolidBrush(FillColor);
-        using var pen = new Pen(BorderColor, 1f) { DashStyle = DashStyle.Dash };
+        using var pen = new Pen(BorderColor, 1.2f) { DashPattern = new[] { 6f, 6f } };
         e.Graphics.FillPath(fill, path);
         e.Graphics.DrawPath(pen, path);
     }
