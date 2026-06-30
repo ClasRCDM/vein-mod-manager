@@ -415,8 +415,7 @@ public sealed partial class MainForm : Form
         DrawPreviewTab(graphics, "Setup", 36, 296, SidebarWidth - 36, selected: false);
         DrawPreviewTab(graphics, "Server Manager", 36, 350, SidebarWidth - 36, selected: false);
         DrawPreviewTab(graphics, "Mods", 36, 404, SidebarWidth - 36, selected: false);
-        DrawPreviewTab(graphics, "Scripts", 36, 458, SidebarWidth - 36, selected: false);
-        DrawPreviewTab(graphics, "Log", 36, 512, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Log", 36, 458, SidebarWidth - 36, selected: false);
         DrawPreviewPanel(graphics, new Rectangle(34, 658, SidebarWidth - 32, 86), 8, InnerBack, BorderSoft);
         DrawPreviewText(graphics, "Vein Mod Manager", 50, 672, 9.5F, FontStyle.Regular, TextMuted, width: 140);
         DrawPreviewText(graphics, "v1.0.0", 50, 694, 8.5F, FontStyle.Regular, TextDim, width: 140);
@@ -860,7 +859,7 @@ public sealed partial class MainForm : Form
         _tabPages["Log"] = BuildLogTab();
 
         var y = 204;
-        foreach (var title in new[] { "Dashboard", "Setup", "Server Manager" })
+        foreach (var title in new[] { "Dashboard", "Setup", "Server Manager", "Mods", "Log" })
         {
             var button = NewSidebarTabButton(title, 14, y);
             button.Click += (_, _) => ShowTab(title);
@@ -868,31 +867,6 @@ public sealed partial class MainForm : Form
             _sidebar.Controls.Add(button);
             y += 54;
         }
-
-        AddSidebarShortcut("Server Settings", y, () =>
-        {
-            ShowTab("Server Manager");
-            ShowServerSubTab("Connection / Config");
-        }, "Open the server connection and config settings.");
-        y += 54;
-
-        var modsButton = NewSidebarTabButton("Mods", 14, y);
-        modsButton.Click += (_, _) => ShowTab("Mods");
-        _tabButtons["Mods"] = modsButton;
-        _sidebar.Controls.Add(modsButton);
-        y += 54;
-
-        AddSidebarShortcut("Scripts", y, () =>
-        {
-            ShowTab("Mods");
-            ShowModsSubTab("Scripts");
-        }, "Open the Scripts workspace.");
-        y += 54;
-
-        var logButton = NewSidebarTabButton("Log", 14, y);
-        logButton.Click += (_, _) => ShowTab("Log");
-        _tabButtons["Log"] = logButton;
-        _sidebar.Controls.Add(logButton);
 
         foreach (var page in _tabPages.Values)
         {
@@ -904,13 +878,6 @@ public sealed partial class MainForm : Form
         ShowTab("Mods");
     }
 
-    private void AddSidebarShortcut(string title, int y, Action action, string tip)
-    {
-        var button = NewSidebarTabButton(title, 14, y);
-        button.Click += (_, _) => action();
-        AddTip(button, tip);
-        _sidebar.Controls.Add(button);
-    }
 
     private void ShowTab(string title)
     {
@@ -1303,11 +1270,8 @@ public sealed partial class MainForm : Form
 
         details.Controls.Add(MakeLabel("DESCRIPTION", 18, 288, 140, 18, 8F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, details.FillColor));
         details.Controls.Add(MakeWrappedLabel("Adds a one-click deposit-all button to nearby storage and automatically sorts your inventory by type.", 18, 308, 260, 38, 8.6F, FontStyle.Regular, TextMuted, details.FillColor));
-        var disable = MakeButton("Disable", 18, 352, 132, 34, () => Log("Select a managed mod before changing status."));
-        disable.Enabled = false;
-        details.Controls.Add(disable);
+        details.Controls.Add(MakeButton("Disable", 18, 352, 132, 34, () => Log("Select a managed mod before changing status.")));
         var remove = MakeButton("Remove mod", 164, 352, 128, 34, () => Log("Select a managed mod before removing it."));
-        remove.Enabled = false;
         remove.FillColor = Color.FromArgb(14, 16, 26);
         remove.HoverColor = Color.FromArgb(42, 18, 27);
         remove.BorderColor = Color.FromArgb(80, 35, 43);
@@ -4490,9 +4454,7 @@ public sealed partial class MainForm : Form
         "Dashboard" => "\uE80F",
         "Setup" => "\uE90F",
         "Server Manager" => "\uE968",
-        "Server Settings" => "\uE713",
         "Mods" => "\uE713",
-        "Scripts" => "\uE943",
         "Log" => "\uE8FD",
         _ => string.Empty
     };
