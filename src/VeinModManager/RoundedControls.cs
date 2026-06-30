@@ -99,6 +99,150 @@ public sealed class RedGlowPanel : RoundedPanel
     }
 }
 
+public sealed class VeinLogoPanel : Control
+{
+    public Color GlowColor { get; set; } = Color.FromArgb(185, 24, 38);
+    public Color MainColor { get; set; } = Color.White;
+    public Color AccentColor { get; set; } = Color.FromArgb(185, 24, 38);
+
+    public VeinLogoPanel()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        e.Graphics.Clear(BackColor);
+
+        using var glowPath = new GraphicsPath();
+        glowPath.AddEllipse(4, 24, Math.Max(1, Width - 8), 76);
+        using var glowBrush = new PathGradientBrush(glowPath)
+        {
+            CenterColor = Color.FromArgb(135, GlowColor),
+            SurroundColors = new[] { Color.FromArgb(0, GlowColor) }
+        };
+        e.Graphics.FillPath(glowBrush, glowPath);
+
+        using var veinFont = new Font("Segoe UI", 39F, FontStyle.Bold, GraphicsUnit.Point);
+        using var subFont = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point);
+        using var shadowBrush = new SolidBrush(Color.FromArgb(180, AccentColor));
+        using var mainBrush = new SolidBrush(MainColor);
+        using var subBrush = new SolidBrush(Color.FromArgb(238, 242, 255));
+        using var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap };
+
+        var veinRect = new RectangleF(0, 8, Width, 70);
+        var shadowRect = new RectangleF(2, 12, Width, 70);
+        e.Graphics.DrawString("VEIN", veinFont, shadowBrush, shadowRect, format);
+        e.Graphics.DrawString("VEIN", veinFont, mainBrush, veinRect, format);
+        e.Graphics.DrawString("MOD MANAGER", subFont, subBrush, new RectangleF(0, 88, Width, 30), format);
+    }
+}
+
+public enum ScriptIconKind
+{
+    Clock,
+    Bell,
+    Disk,
+    Bulb
+}
+
+public sealed class ScriptIconPanel : Control
+{
+    public ScriptIconKind Kind { get; set; }
+    public Color IconColor { get; set; } = Color.White;
+
+    public ScriptIconPanel()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        e.Graphics.Clear(BackColor);
+
+        switch (Kind)
+        {
+            case ScriptIconKind.Clock:
+                DrawClock(e.Graphics, ClientRectangle, IconColor);
+                break;
+            case ScriptIconKind.Bell:
+                DrawBell(e.Graphics, ClientRectangle, IconColor);
+                break;
+            case ScriptIconKind.Disk:
+                DrawDisk(e.Graphics, ClientRectangle, IconColor);
+                break;
+            case ScriptIconKind.Bulb:
+                DrawBulb(e.Graphics, ClientRectangle, IconColor);
+                break;
+        }
+    }
+
+    private static void DrawClock(Graphics graphics, Rectangle bounds, Color color)
+    {
+        var size = Math.Min(bounds.Width, bounds.Height);
+        var rect = new RectangleF(bounds.Left + (bounds.Width - size) / 2f + size * 0.24f, bounds.Top + size * 0.24f, size * 0.52f, size * 0.52f);
+        using var pen = new Pen(color, Math.Max(1.8f, size * 0.04f));
+        using var brush = new SolidBrush(color);
+        graphics.DrawEllipse(pen, rect);
+        graphics.DrawLine(pen, rect.Left + rect.Width / 2f, rect.Top + rect.Height / 2f, rect.Left + rect.Width / 2f, rect.Top + rect.Height * 0.28f);
+        graphics.DrawLine(pen, rect.Left + rect.Width / 2f, rect.Top + rect.Height / 2f, rect.Left + rect.Width * 0.68f, rect.Top + rect.Height * 0.62f);
+        graphics.FillEllipse(brush, rect.Left + rect.Width / 2f - 2f, rect.Top + rect.Height / 2f - 2f, 4f, 4f);
+        graphics.DrawLine(pen, rect.Left + rect.Width * 0.35f, rect.Top - 4f, rect.Left + rect.Width * 0.65f, rect.Top - 4f);
+    }
+
+    private static void DrawBell(Graphics graphics, Rectangle bounds, Color color)
+    {
+        var size = Math.Min(bounds.Width, bounds.Height);
+        var cx = bounds.Left + bounds.Width / 2f;
+        var top = bounds.Top + size * 0.22f;
+        var bottom = bounds.Top + size * 0.72f;
+        using var path = new GraphicsPath();
+        path.AddBezier(cx - size * 0.22f, bottom - size * 0.08f, cx - size * 0.25f, top + size * 0.18f, cx - size * 0.11f, top, cx, top);
+        path.AddBezier(cx, top, cx + size * 0.11f, top, cx + size * 0.25f, top + size * 0.18f, cx + size * 0.22f, bottom - size * 0.08f);
+        path.AddLine(cx + size * 0.22f, bottom - size * 0.08f, cx + size * 0.31f, bottom);
+        path.AddLine(cx + size * 0.31f, bottom, cx - size * 0.31f, bottom);
+        path.AddLine(cx - size * 0.31f, bottom, cx - size * 0.22f, bottom - size * 0.08f);
+        using var fill = new SolidBrush(Color.FromArgb(232, color));
+        using var pen = new Pen(color, Math.Max(1.6f, size * 0.035f));
+        graphics.FillPath(fill, path);
+        graphics.DrawPath(pen, path);
+        graphics.FillEllipse(fill, cx - size * 0.07f, bottom + size * 0.02f, size * 0.14f, size * 0.14f);
+        graphics.DrawArc(pen, cx - size * 0.12f, top - size * 0.08f, size * 0.24f, size * 0.18f, 205, 130);
+    }
+
+    private static void DrawDisk(Graphics graphics, Rectangle bounds, Color color)
+    {
+        var size = Math.Min(bounds.Width, bounds.Height);
+        var rect = new Rectangle(bounds.Left + (int)(size * 0.25f), bounds.Top + (int)(size * 0.2f), (int)(size * 0.5f), (int)(size * 0.58f));
+        using var path = RoundedPanel.RoundedRect(rect, Math.Max(2, (int)(size * 0.04f)));
+        using var pen = new Pen(color, Math.Max(1.8f, size * 0.04f));
+        using var fill = new SolidBrush(Color.FromArgb(18, color));
+        using var brush = new SolidBrush(color);
+        graphics.FillPath(fill, path);
+        graphics.DrawPath(pen, path);
+        graphics.FillRectangle(brush, rect.Left + rect.Width * 0.58f, rect.Top + rect.Height * 0.1f, rect.Width * 0.2f, rect.Height * 0.22f);
+        graphics.DrawLine(pen, rect.Left + rect.Width * 0.22f, rect.Bottom - rect.Height * 0.25f, rect.Right - rect.Width * 0.22f, rect.Bottom - rect.Height * 0.25f);
+    }
+
+    private static void DrawBulb(Graphics graphics, Rectangle bounds, Color color)
+    {
+        var size = Math.Min(bounds.Width, bounds.Height);
+        var cx = bounds.Left + bounds.Width / 2f;
+        using var fill = new SolidBrush(Color.FromArgb(230, color));
+        using var pen = new Pen(color, Math.Max(1.5f, size * 0.04f));
+        var bulb = new RectangleF(cx - size * 0.16f, bounds.Top + size * 0.2f, size * 0.32f, size * 0.34f);
+        graphics.FillEllipse(fill, bulb);
+        graphics.DrawEllipse(pen, bulb);
+        graphics.DrawLine(pen, cx - size * 0.08f, bounds.Top + size * 0.58f, cx + size * 0.08f, bounds.Top + size * 0.58f);
+        graphics.DrawLine(pen, cx - size * 0.07f, bounds.Top + size * 0.66f, cx + size * 0.07f, bounds.Top + size * 0.66f);
+        graphics.DrawLine(pen, cx, bounds.Top + size * 0.54f, cx, bounds.Top + size * 0.42f);
+    }
+}
+
 public sealed class RoundedButton : Button
 {
     public int Radius { get; set; } = 10;

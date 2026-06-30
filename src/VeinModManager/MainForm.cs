@@ -288,8 +288,9 @@ public sealed partial class MainForm : Form
         if (_sidebarFooter != null && _sidebar != null)
         {
             _sidebarFooter.Height = 120;
+            _sidebarFooter.Left = 2;
             _sidebarFooter.Top = Math.Max(0, _sidebar.Height - _sidebarFooter.Height - 20);
-            _sidebarFooter.Width = Math.Max(0, _sidebar.Width - 24);
+            _sidebarFooter.Width = Math.Max(0, _sidebar.Width - 4);
         }
 
         if (_settingsButton != null)
@@ -688,26 +689,21 @@ public sealed partial class MainForm : Form
         _sidebar.BorderColor = BorderSoft;
         Controls.Add(_sidebar);
 
-        var logo = new RedGlowPanel
+        var logo = new VeinLogoPanel
         {
             Left = 28,
             Top = 58,
             Width = 164,
             Height = 150,
-            Radius = 10,
-            FillColor = SidebarBack,
-            BorderColor = SidebarBack,
             BackColor = SidebarBack,
-            GlowColor = Color.FromArgb(185, 24, 38)
+            GlowColor = Color.FromArgb(185, 24, 38),
+            AccentColor = Color.FromArgb(185, 24, 38),
+            MainColor = Color.White
         };
-        logo.Controls.Add(MakeLabel("VEIN", 2, 16, logo.Width, 64, 39F, FontStyle.Bold, Color.FromArgb(180, 36, 48), ContentAlignment.MiddleCenter, SidebarBack));
-        logo.Controls.Add(MakeLabel("VEIN", 0, 12, logo.Width, 64, 39F, FontStyle.Bold, Color.White, ContentAlignment.MiddleCenter, SidebarBack));
-        logo.Controls.Add(MakeLabel("MOD MANAGER", 1, 92, logo.Width, 28, 10F, FontStyle.Bold, Color.FromArgb(150, 28, 38), ContentAlignment.MiddleCenter, SidebarBack));
-        logo.Controls.Add(MakeLabel("MOD MANAGER", 0, 90, logo.Width, 28, 10F, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, SidebarBack));
         _sidebar.Controls.Add(logo);
         _sidebar.Controls.Add(Line(20, 200, SidebarWidth - 40));
 
-        _sidebarFooter = NewPanel(8, 12, 814, SidebarWidth - 24, 120);
+        _sidebarFooter = NewPanel(8, 2, 814, SidebarWidth - 4, 120);
         _sidebarFooter.FillColor = InnerBack;
         _sidebarFooter.BorderColor = BorderSoft;
         _sidebarFooter.BackColor = SidebarBack;
@@ -1320,7 +1316,7 @@ public sealed partial class MainForm : Form
             "Batch - Every 6 hours",
             "Gracefully warns players, saves the world and restarts the server process on a fixed interval to clear memory.",
             "Active",
-            "\u23F1",
+            ScriptIconKind.Clock,
             enabled: true,
             x: 18,
             y: 220,
@@ -1332,7 +1328,7 @@ public sealed partial class MainForm : Form
             "Lua - On player join/leave",
             "Posts live player count, server status and join notifications to a configured Discord channel.",
             "Active",
-            "\uD83D\uDD14",
+            ScriptIconKind.Bell,
             enabled: true,
             x: 626,
             y: 220,
@@ -1344,7 +1340,7 @@ public sealed partial class MainForm : Form
             "PowerShell - Daily at 04:00",
             "Zips the save folder and config files to a timestamped archive, keeping the last 14 days of backups.",
             "Paused",
-            "\uD83D\uDCBE",
+            ScriptIconKind.Disk,
             enabled: false,
             x: 18,
             y: 504,
@@ -1361,8 +1357,13 @@ public sealed partial class MainForm : Form
         var notice = NewPanel(10, 0, 788, 1213, 72);
         notice.FillColor = Color.FromArgb(13, 14, 35);
         notice.BorderColor = Color.FromArgb(28, 35, 70);
-        var noticeIcon = MakeLabel("\uD83D\uDCA1", 28, 20, 28, 28, 14, FontStyle.Regular, Color.FromArgb(255, 219, 76), ContentAlignment.MiddleCenter, notice.FillColor);
-        noticeIcon.Font = new Font("Segoe UI Emoji", 14F, FontStyle.Regular);
+        var noticeIcon = new ScriptIconPanel
+        {
+            Kind = ScriptIconKind.Bulb,
+            IconColor = Color.FromArgb(255, 219, 76),
+            BackColor = notice.FillColor
+        };
+        noticeIcon.SetBounds(28, 20, 28, 28);
         notice.Controls.Add(noticeIcon);
         notice.Controls.Add(MakeLabel("Scripts run inside a sandbox with access to RCON and the server API. Review community scripts before enabling them on a live server.", 70, 22, 1100, 28, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, notice.FillColor));
         panel.Controls.Add(notice);
@@ -1436,19 +1437,21 @@ public sealed partial class MainForm : Form
         parent.Controls.Add(label);
 
         if (!selected) return;
-
-        var underline = new Panel
+        var underline = new RoundedPanel
         {
             Left = x,
             Top = parent.Height - 4,
             Width = width,
             Height = 4,
-            BackColor = Color.FromArgb(147, 82, 255)
+            Radius = 2,
+            FillColor = Color.FromArgb(147, 82, 255),
+            BorderColor = Color.FromArgb(147, 82, 255),
+            BackColor = parent is RoundedPanel underlineParent ? underlineParent.FillColor : parent.BackColor
         };
         parent.Controls.Add(underline);
     }
 
-    private RoundedPanel BuildScriptCard(string title, string subtitle, string description, string status, string icon, bool enabled, int x, int y, int w, int h)
+    private RoundedPanel BuildScriptCard(string title, string subtitle, string description, string status, ScriptIconKind iconKind, bool enabled, int x, int y, int w, int h)
     {
         var card = NewPanel(12, x, y, w, h);
         card.FillColor = Color.FromArgb(11, 18, 34);
@@ -1457,11 +1460,16 @@ public sealed partial class MainForm : Form
         var iconBox = NewPanel(8, 28, 28, 64, 64);
         iconBox.FillColor = Color.FromArgb(16, 23, 43);
         iconBox.BorderColor = Color.FromArgb(31, 38, 70);
-        var iconColor = title.Equals("Discord Status Webhook", StringComparison.Ordinal) ? Color.FromArgb(255, 207, 64) : enabled ? TextMain : TextMuted;
-        var iconLabel = MakeLabel(icon, 0, 0, 64, 64, 20, FontStyle.Regular, iconColor, ContentAlignment.MiddleCenter, iconBox.FillColor);
+        var iconColor = iconKind == ScriptIconKind.Bell ? Color.FromArgb(255, 207, 64) : enabled ? TextMain : TextMuted;
+        var iconPanel = new ScriptIconPanel
+        {
+            Kind = iconKind,
+            IconColor = iconColor,
+            BackColor = iconBox.FillColor
+        };
+        iconPanel.SetBounds(0, 0, 64, 64);
         iconBox.BackColor = card.FillColor;
-        iconLabel.Font = new Font("Segoe UI Emoji", 20F, FontStyle.Regular);
-        iconBox.Controls.Add(iconLabel);
+        iconBox.Controls.Add(iconPanel);
 
         var titleLabel = MakeLabel(title, 112, 30, w - 220, 30, 13.5F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, card.FillColor);
         var subtitleLabel = MakeLabel(subtitle, 112, 60, w - 220, 24, 10.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, card.FillColor);
@@ -1497,7 +1505,7 @@ public sealed partial class MainForm : Form
             var cardWidth = card.ClientSize.Width;
             var cardHeight = card.ClientSize.Height;
             iconBox.SetBounds(28, 28, 64, 64);
-            iconLabel.SetBounds(0, 0, 64, 64);
+            iconPanel.SetBounds(0, 0, 64, 64);
             titleLabel.SetBounds(112, 30, Math.Max(0, cardWidth - 220), 30);
             subtitleLabel.SetBounds(112, 60, Math.Max(0, cardWidth - 220), 24);
             toggle.SetBounds(cardWidth - 78, 32, 58, 30);
@@ -4532,9 +4540,9 @@ public sealed partial class MainForm : Form
         return new RoundedButton
         {
             Text = text,
-            Left = 12,
+            Left = 2,
             Top = y,
-            Width = SidebarWidth - 24,
+            Width = SidebarWidth - 4,
             Height = 60,
             Radius = 8,
             FillColor = InnerBack,
@@ -4544,7 +4552,7 @@ public sealed partial class MainForm : Form
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             IconText = SidebarIconFor(text),
             IconFont = text.Equals("Scripts", StringComparison.Ordinal) ? new Font("Segoe UI", 11F, FontStyle.Bold) : new Font("Segoe MDL2 Assets", 12F, FontStyle.Regular),
-            ContentLeftPadding = 20,
+            ContentLeftPadding = 24,
             IconTextGap = 14,
             FlatStyle = FlatStyle.Flat
         };
