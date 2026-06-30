@@ -4490,7 +4490,9 @@ public sealed partial class MainForm : Form
         "Dashboard" => "\uE80F",
         "Setup" => "\uE90F",
         "Server Manager" => "\uE968",
+        "Server Settings" => "\uE713",
         "Mods" => "\uE713",
+        "Scripts" => "\uE943",
         "Log" => "\uE8FD",
         _ => string.Empty
     };
