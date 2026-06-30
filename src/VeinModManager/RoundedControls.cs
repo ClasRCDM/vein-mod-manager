@@ -184,62 +184,114 @@ public sealed class ScriptIconPanel : Control
     private static void DrawClock(Graphics graphics, Rectangle bounds, Color color)
     {
         var size = Math.Min(bounds.Width, bounds.Height);
-        var rect = new RectangleF(bounds.Left + (bounds.Width - size) / 2f + size * 0.24f, bounds.Top + size * 0.24f, size * 0.52f, size * 0.52f);
-        using var pen = new Pen(color, Math.Max(1.8f, size * 0.04f));
-        using var brush = new SolidBrush(color);
-        graphics.DrawEllipse(pen, rect);
-        graphics.DrawLine(pen, rect.Left + rect.Width / 2f, rect.Top + rect.Height / 2f, rect.Left + rect.Width / 2f, rect.Top + rect.Height * 0.28f);
-        graphics.DrawLine(pen, rect.Left + rect.Width / 2f, rect.Top + rect.Height / 2f, rect.Left + rect.Width * 0.68f, rect.Top + rect.Height * 0.62f);
-        graphics.FillEllipse(brush, rect.Left + rect.Width / 2f - 2f, rect.Top + rect.Height / 2f - 2f, 4f, 4f);
-        graphics.DrawLine(pen, rect.Left + rect.Width * 0.35f, rect.Top - 4f, rect.Left + rect.Width * 0.65f, rect.Top - 4f);
+        var cx = bounds.Left + bounds.Width / 2f;
+        var cy = bounds.Top + bounds.Height / 2f;
+        var face = new RectangleF(cx - size * 0.25f, cy - size * 0.22f, size * 0.5f, size * 0.5f);
+        var rim = RectangleF.Inflate(face, size * 0.045f, size * 0.045f);
+        using var rimBrush = new LinearGradientBrush(rim, Color.FromArgb(245, 248, 255), Color.FromArgb(138, 154, 183), 90f);
+        using var faceBrush = new SolidBrush(Color.FromArgb(252, 254, 255));
+        using var rimPen = new Pen(Color.FromArgb(220, 232, 255), Math.Max(1.5f, size * 0.028f));
+        using var handPen = new Pen(Color.FromArgb(23, 30, 46), Math.Max(1.7f, size * 0.032f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var tickPen = new Pen(Color.FromArgb(72, 84, 112), Math.Max(1f, size * 0.018f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var darkBrush = new SolidBrush(Color.FromArgb(35, 43, 62));
+        graphics.FillEllipse(rimBrush, rim);
+        graphics.DrawEllipse(rimPen, rim);
+        graphics.FillEllipse(faceBrush, face);
+        for (var i = 0; i < 12; i++)
+        {
+            var angle = Math.PI * 2d * i / 12d - Math.PI / 2d;
+            var outer = face.Width * 0.43f;
+            var inner = face.Width * 0.36f;
+            var x1 = cx + (float)Math.Cos(angle) * inner;
+            var y1 = cy + (float)Math.Sin(angle) * inner;
+            var x2 = cx + (float)Math.Cos(angle) * outer;
+            var y2 = cy + (float)Math.Sin(angle) * outer;
+            graphics.DrawLine(tickPen, x1, y1, x2, y2);
+        }
+        graphics.DrawLine(handPen, cx, cy, cx, cy - face.Height * 0.24f);
+        graphics.DrawLine(handPen, cx, cy, cx + face.Width * 0.18f, cy + face.Height * 0.12f);
+        graphics.FillEllipse(darkBrush, cx - size * 0.035f, cy - size * 0.035f, size * 0.07f, size * 0.07f);
+        using var bellBrush = new SolidBrush(Color.FromArgb(230, 236, 249));
+        graphics.FillEllipse(bellBrush, rim.Left + rim.Width * 0.05f, rim.Top - size * 0.06f, size * 0.13f, size * 0.1f);
+        graphics.FillEllipse(bellBrush, rim.Right - size * 0.18f, rim.Top - size * 0.06f, size * 0.13f, size * 0.1f);
     }
 
     private static void DrawBell(Graphics graphics, Rectangle bounds, Color color)
     {
         var size = Math.Min(bounds.Width, bounds.Height);
         var cx = bounds.Left + bounds.Width / 2f;
-        var top = bounds.Top + size * 0.22f;
-        var bottom = bounds.Top + size * 0.72f;
+        var top = bounds.Top + size * 0.18f;
+        var bottom = bounds.Top + size * 0.74f;
         using var path = new GraphicsPath();
-        path.AddBezier(cx - size * 0.22f, bottom - size * 0.08f, cx - size * 0.25f, top + size * 0.18f, cx - size * 0.11f, top, cx, top);
-        path.AddBezier(cx, top, cx + size * 0.11f, top, cx + size * 0.25f, top + size * 0.18f, cx + size * 0.22f, bottom - size * 0.08f);
-        path.AddLine(cx + size * 0.22f, bottom - size * 0.08f, cx + size * 0.31f, bottom);
-        path.AddLine(cx + size * 0.31f, bottom, cx - size * 0.31f, bottom);
-        path.AddLine(cx - size * 0.31f, bottom, cx - size * 0.22f, bottom - size * 0.08f);
-        using var fill = new SolidBrush(Color.FromArgb(232, color));
-        using var pen = new Pen(color, Math.Max(1.6f, size * 0.035f));
+        path.AddBezier(cx - size * 0.23f, bottom - size * 0.1f, cx - size * 0.27f, top + size * 0.2f, cx - size * 0.12f, top, cx, top);
+        path.AddBezier(cx, top, cx + size * 0.12f, top, cx + size * 0.27f, top + size * 0.2f, cx + size * 0.23f, bottom - size * 0.1f);
+        path.AddLine(cx + size * 0.23f, bottom - size * 0.1f, cx + size * 0.34f, bottom);
+        path.AddBezier(cx + size * 0.23f, bottom + size * 0.04f, cx - size * 0.23f, bottom + size * 0.04f, cx - size * 0.34f, bottom, cx - size * 0.34f, bottom);
+        path.CloseFigure();
+        using var fill = new PathGradientBrush(path)
+        {
+            CenterColor = Color.FromArgb(255, 232, 87),
+            SurroundColors = new[] { Color.FromArgb(217, 151, 21) }
+        };
+        using var pen = new Pen(Color.FromArgb(255, 217, 79), Math.Max(1.6f, size * 0.035f)) { LineJoin = LineJoin.Round };
+        using var shadow = new SolidBrush(Color.FromArgb(70, 0, 0, 0));
+        using var shine = new Pen(Color.FromArgb(190, 255, 249, 170), Math.Max(1f, size * 0.02f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        graphics.FillEllipse(shadow, cx - size * 0.23f, bottom + size * 0.02f, size * 0.46f, size * 0.12f);
         graphics.FillPath(fill, path);
         graphics.DrawPath(pen, path);
-        graphics.FillEllipse(fill, cx - size * 0.07f, bottom + size * 0.02f, size * 0.14f, size * 0.14f);
-        graphics.DrawArc(pen, cx - size * 0.12f, top - size * 0.08f, size * 0.24f, size * 0.18f, 205, 130);
+        graphics.DrawArc(shine, cx - size * 0.16f, top + size * 0.12f, size * 0.18f, size * 0.34f, 190, 92);
+        using var clapper = new SolidBrush(Color.FromArgb(255, 230, 95));
+        graphics.FillEllipse(clapper, cx - size * 0.075f, bottom + size * 0.025f, size * 0.15f, size * 0.15f);
+        graphics.DrawArc(pen, cx - size * 0.11f, top - size * 0.08f, size * 0.22f, size * 0.16f, 205, 130);
     }
 
     private static void DrawDisk(Graphics graphics, Rectangle bounds, Color color)
     {
         var size = Math.Min(bounds.Width, bounds.Height);
-        var rect = new Rectangle(bounds.Left + (int)(size * 0.25f), bounds.Top + (int)(size * 0.2f), (int)(size * 0.5f), (int)(size * 0.58f));
-        using var path = RoundedPanel.RoundedRect(rect, Math.Max(2, (int)(size * 0.04f)));
-        using var pen = new Pen(color, Math.Max(1.8f, size * 0.04f));
-        using var fill = new SolidBrush(Color.FromArgb(18, color));
-        using var brush = new SolidBrush(color);
+        var rect = new RectangleF(bounds.Left + size * 0.25f, bounds.Top + size * 0.18f, size * 0.5f, size * 0.6f);
+        using var path = RoundedPanel.RoundedRect(Rectangle.Round(rect), Math.Max(2, (int)(size * 0.045f)));
+        using var fill = new LinearGradientBrush(rect, Color.FromArgb(255, 255, 255), Color.FromArgb(178, 194, 224), 90f);
+        using var pen = new Pen(Color.FromArgb(226, 235, 255), Math.Max(1.6f, size * 0.035f)) { LineJoin = LineJoin.Round };
+        using var dark = new SolidBrush(Color.FromArgb(42, 54, 78));
+        using var slot = new SolidBrush(Color.FromArgb(235, 241, 255));
         graphics.FillPath(fill, path);
         graphics.DrawPath(pen, path);
-        graphics.FillRectangle(brush, rect.Left + rect.Width * 0.58f, rect.Top + rect.Height * 0.1f, rect.Width * 0.2f, rect.Height * 0.22f);
-        graphics.DrawLine(pen, rect.Left + rect.Width * 0.22f, rect.Bottom - rect.Height * 0.25f, rect.Right - rect.Width * 0.22f, rect.Bottom - rect.Height * 0.25f);
+        graphics.FillRectangle(dark, rect.Left + rect.Width * 0.16f, rect.Top + rect.Height * 0.1f, rect.Width * 0.66f, rect.Height * 0.26f);
+        graphics.FillRectangle(slot, rect.Left + rect.Width * 0.58f, rect.Top + rect.Height * 0.12f, rect.Width * 0.16f, rect.Height * 0.2f);
+        using var linePen = new Pen(Color.FromArgb(72, 85, 115), Math.Max(1.2f, size * 0.026f));
+        graphics.DrawLine(linePen, rect.Left + rect.Width * 0.18f, rect.Bottom - rect.Height * 0.25f, rect.Right - rect.Width * 0.18f, rect.Bottom - rect.Height * 0.25f);
+        graphics.DrawLine(linePen, rect.Left + rect.Width * 0.18f, rect.Bottom - rect.Height * 0.15f, rect.Right - rect.Width * 0.18f, rect.Bottom - rect.Height * 0.15f);
     }
 
     private static void DrawBulb(Graphics graphics, Rectangle bounds, Color color)
     {
         var size = Math.Min(bounds.Width, bounds.Height);
         var cx = bounds.Left + bounds.Width / 2f;
-        using var fill = new SolidBrush(Color.FromArgb(230, color));
-        using var pen = new Pen(color, Math.Max(1.5f, size * 0.04f));
+        var cy = bounds.Top + bounds.Height / 2f;
+        using var rayPen = new Pen(Color.FromArgb(155, color), Math.Max(1f, size * 0.035f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        for (var i = 0; i < 7; i++)
+        {
+            var angle = Math.PI * 2d * i / 7d - Math.PI / 2d;
+            var x1 = cx + (float)Math.Cos(angle) * size * 0.25f;
+            var y1 = cy + (float)Math.Sin(angle) * size * 0.25f;
+            var x2 = cx + (float)Math.Cos(angle) * size * 0.34f;
+            var y2 = cy + (float)Math.Sin(angle) * size * 0.34f;
+            graphics.DrawLine(rayPen, x1, y1, x2, y2);
+        }
         var bulb = new RectangleF(cx - size * 0.16f, bounds.Top + size * 0.2f, size * 0.32f, size * 0.34f);
-        graphics.FillEllipse(fill, bulb);
-        graphics.DrawEllipse(pen, bulb);
-        graphics.DrawLine(pen, cx - size * 0.08f, bounds.Top + size * 0.58f, cx + size * 0.08f, bounds.Top + size * 0.58f);
-        graphics.DrawLine(pen, cx - size * 0.07f, bounds.Top + size * 0.66f, cx + size * 0.07f, bounds.Top + size * 0.66f);
-        graphics.DrawLine(pen, cx, bounds.Top + size * 0.54f, cx, bounds.Top + size * 0.42f);
+        using var bulbPath = new GraphicsPath();
+        bulbPath.AddEllipse(bulb);
+        using var fill = new PathGradientBrush(bulbPath)
+        {
+            CenterColor = Color.FromArgb(255, 246, 126),
+            SurroundColors = new[] { Color.FromArgb(229, 168, 28) }
+        };
+        using var pen = new Pen(Color.FromArgb(255, 225, 84), Math.Max(1.2f, size * 0.035f));
+        graphics.FillPath(fill, bulbPath);
+        graphics.DrawPath(pen, bulbPath);
+        using var basePen = new Pen(Color.FromArgb(227, 210, 132), Math.Max(1.2f, size * 0.04f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        graphics.DrawLine(basePen, cx - size * 0.09f, bounds.Top + size * 0.59f, cx + size * 0.09f, bounds.Top + size * 0.59f);
+        graphics.DrawLine(basePen, cx - size * 0.075f, bounds.Top + size * 0.68f, cx + size * 0.075f, bounds.Top + size * 0.68f);
     }
 }
 
