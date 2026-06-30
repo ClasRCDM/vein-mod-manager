@@ -701,7 +701,7 @@ public sealed partial class MainForm : Form
         _tabPages["Log"] = BuildLogTab();
 
         var y = 214;
-        foreach (var title in new[] { "Dashboard", "Setup", "Server Manager", "Log" })
+        foreach (var title in new[] { "Dashboard", "Setup", "Server Manager" })
         {
             var button = NewSidebarTabButton(title, 18, y);
             button.Click += (_, _) => ShowTab(title);
@@ -709,6 +709,24 @@ public sealed partial class MainForm : Form
             _sidebar.Controls.Add(button);
             y += 52;
         }
+
+        AddSidebarShortcut("Server Settings", y, () =>
+        {
+            ShowTab("Server Manager");
+            ShowServerSubTab("Connection / Config");
+        }, "Open the server connection and config settings.");
+        y += 52;
+
+        AddSidebarShortcut("Mods", y, OpenModFolder, "Open the selected mod folder.");
+        y += 52;
+
+        AddSidebarShortcut("Scripts", y, OpenConfigFolder, "Open the selected mod Scripts folder.");
+        y += 52;
+
+        var logButton = NewSidebarTabButton("Log", 18, y);
+        logButton.Click += (_, _) => ShowTab("Log");
+        _tabButtons["Log"] = logButton;
+        _sidebar.Controls.Add(logButton);
 
         foreach (var page in _tabPages.Values)
         {
@@ -718,6 +736,14 @@ public sealed partial class MainForm : Form
 
         Controls.Add(shell);
         ShowTab("Dashboard");
+    }
+
+    private void AddSidebarShortcut(string title, int y, Action action, string tip)
+    {
+        var button = NewSidebarTabButton(title, 18, y);
+        button.Click += (_, _) => action();
+        AddTip(button, tip);
+        _sidebar.Controls.Add(button);
     }
 
     private void ShowTab(string title)
