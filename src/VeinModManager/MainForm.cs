@@ -1288,8 +1288,10 @@ public sealed partial class MainForm : Form
         panel.BorderColor = AppBack;
         panel.FillColor = AppBack;
 
+        panel.Controls.Add(MakeLabel("Scripts", 0, 24, 150, 48, 26F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
         var experimental = NewPill("EXPERIMENTAL", 148, 34, 142, 30, Color.FromArgb(35, 24, 72));
         experimental.BackColor = AppBack;
+        experimental.BorderColor = Color.FromArgb(88, 68, 180);
         experimental.Radius = 15;
         panel.Controls.Add(experimental);
         panel.Controls.Add(MakeLabel("Community automation for your server \u2014 scheduled tasks, webhooks and custom hooks.", 0, 82, 820, 30, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
@@ -1427,9 +1429,23 @@ public sealed partial class MainForm : Form
         if (!string.IsNullOrEmpty(icon))
         {
             var tabBack = parent is RoundedPanel roundedParent ? roundedParent.FillColor : parent.BackColor;
-            var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, tabBack);
-            iconLabel.Font = icon.Equals("</>", StringComparison.Ordinal) ? new Font("Segoe UI", 10F, FontStyle.Bold) : new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
-            parent.Controls.Add(iconLabel);
+            if (icon.Equals("</>", StringComparison.Ordinal))
+            {
+                var codeIcon = new ScriptIconPanel
+                {
+                    Kind = ScriptIconKind.Code,
+                    IconColor = TextDim,
+                    BackColor = tabBack
+                };
+                codeIcon.SetBounds(x, 17, 22, 24);
+                parent.Controls.Add(codeIcon);
+            }
+            else
+            {
+                var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, tabBack);
+                iconLabel.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
+                parent.Controls.Add(iconLabel);
+            }
         }
 
         var labelBack = parent is RoundedPanel labelParent ? labelParent.FillColor : parent.BackColor;

@@ -145,7 +145,8 @@ public enum ScriptIconKind
     Clock,
     Bell,
     Disk,
-    Bulb
+    Bulb,
+    Code
 }
 
 public sealed class ScriptIconPanel : Control
@@ -184,6 +185,9 @@ public sealed class ScriptIconPanel : Control
             case ScriptIconKind.Bulb:
                 DrawBulb(graphics, ClientRectangle, IconColor);
                 break;
+            case ScriptIconKind.Code:
+                DrawCode(graphics, ClientRectangle, IconColor);
+                break;
         }
 
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -215,9 +219,9 @@ public sealed class ScriptIconPanel : Control
         graphics.DrawLine(handPen, cx, cy, cx, cy - face.Height * 0.25f);
         graphics.DrawLine(handPen, cx, cy, cx + face.Width * 0.2f, cy + face.Height * 0.13f);
         graphics.FillEllipse(darkBrush, cx - size * 0.04f, cy - size * 0.04f, size * 0.08f, size * 0.08f);
-        using var bellBrush = new SolidBrush(Color.FromArgb(234, 240, 252));
-        graphics.FillEllipse(bellBrush, rim.Left + rim.Width * 0.06f, rim.Top - size * 0.065f, size * 0.14f, size * 0.105f);
-        graphics.FillEllipse(bellBrush, rim.Right - size * 0.2f, rim.Top - size * 0.065f, size * 0.14f, size * 0.105f);
+        using var knobBrush = new SolidBrush(Color.FromArgb(234, 240, 252));
+        graphics.FillRectangle(knobBrush, cx - size * 0.055f, rim.Top - size * 0.075f, size * 0.11f, size * 0.07f);
+        graphics.FillEllipse(knobBrush, rim.Right - size * 0.08f, rim.Top + rim.Height * 0.14f, size * 0.09f, size * 0.09f);
     }
 
     private static void DrawBell(Graphics graphics, Rectangle bounds, Color color)
@@ -272,30 +276,43 @@ public sealed class ScriptIconPanel : Control
         var size = Math.Min(bounds.Width, bounds.Height);
         var cx = bounds.Left + bounds.Width / 2f;
         var cy = bounds.Top + bounds.Height / 2f;
-        using var rayPen = new Pen(Color.FromArgb(155, color), Math.Max(1f, size * 0.035f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-        for (var i = 0; i < 7; i++)
+        using var rayPen = new Pen(Color.FromArgb(115, color), Math.Max(1f, size * 0.032f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        for (var i = 0; i < 5; i++)
         {
-            var angle = Math.PI * 2d * i / 7d - Math.PI / 2d;
+            var angle = Math.PI * 2d * i / 5d - Math.PI / 2d;
             var x1 = cx + (float)Math.Cos(angle) * size * 0.25f;
             var y1 = cy + (float)Math.Sin(angle) * size * 0.25f;
             var x2 = cx + (float)Math.Cos(angle) * size * 0.34f;
             var y2 = cy + (float)Math.Sin(angle) * size * 0.34f;
             graphics.DrawLine(rayPen, x1, y1, x2, y2);
         }
-        var bulb = new RectangleF(cx - size * 0.16f, bounds.Top + size * 0.2f, size * 0.32f, size * 0.34f);
+        var bulb = new RectangleF(cx - size * 0.21f, bounds.Top + size * 0.16f, size * 0.42f, size * 0.42f);
         using var bulbPath = new GraphicsPath();
         bulbPath.AddEllipse(bulb);
         using var fill = new PathGradientBrush(bulbPath)
         {
-            CenterColor = Color.FromArgb(255, 246, 126),
-            SurroundColors = new[] { Color.FromArgb(229, 168, 28) }
+            CenterColor = Color.FromArgb(255, 248, 138),
+            SurroundColors = new[] { Color.FromArgb(232, 172, 28) }
         };
-        using var pen = new Pen(Color.FromArgb(255, 225, 84), Math.Max(1.2f, size * 0.035f));
+        using var pen = new Pen(Color.FromArgb(255, 226, 94), Math.Max(1.2f, size * 0.035f));
         graphics.FillPath(fill, bulbPath);
         graphics.DrawPath(pen, bulbPath);
-        using var basePen = new Pen(Color.FromArgb(227, 210, 132), Math.Max(1.2f, size * 0.04f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-        graphics.DrawLine(basePen, cx - size * 0.09f, bounds.Top + size * 0.59f, cx + size * 0.09f, bounds.Top + size * 0.59f);
-        graphics.DrawLine(basePen, cx - size * 0.075f, bounds.Top + size * 0.68f, cx + size * 0.075f, bounds.Top + size * 0.68f);
+        using var basePen = new Pen(Color.FromArgb(226, 210, 132), Math.Max(1.4f, size * 0.045f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        graphics.DrawLine(basePen, cx - size * 0.11f, bounds.Top + size * 0.61f, cx + size * 0.11f, bounds.Top + size * 0.61f);
+        graphics.DrawLine(basePen, cx - size * 0.09f, bounds.Top + size * 0.72f, cx + size * 0.09f, bounds.Top + size * 0.72f);
+    }
+
+    private static void DrawCode(Graphics graphics, Rectangle bounds, Color color)
+    {
+        var size = Math.Min(bounds.Width, bounds.Height);
+        var cx = bounds.Left + bounds.Width / 2f;
+        var cy = bounds.Top + bounds.Height / 2f;
+        using var pen = new Pen(color, Math.Max(1.4f, size * 0.07f)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+        graphics.DrawLine(pen, cx - size * 0.32f, cy, cx - size * 0.18f, cy - size * 0.14f);
+        graphics.DrawLine(pen, cx - size * 0.32f, cy, cx - size * 0.18f, cy + size * 0.14f);
+        graphics.DrawLine(pen, cx + size * 0.32f, cy, cx + size * 0.18f, cy - size * 0.14f);
+        graphics.DrawLine(pen, cx + size * 0.32f, cy, cx + size * 0.18f, cy + size * 0.14f);
+        graphics.DrawLine(pen, cx + size * 0.04f, cy - size * 0.2f, cx - size * 0.04f, cy + size * 0.2f);
     }
 }
 
