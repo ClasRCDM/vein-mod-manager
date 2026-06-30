@@ -1303,10 +1303,13 @@ public sealed partial class MainForm : Form
         filterBar.FillColor = Color.FromArgb(8, 13, 27);
         filterBar.BorderColor = BorderSoft;
         panel.Controls.Add(filterBar);
-        AddScriptFilterTab(filterBar, "All Scripts", string.Empty, 28, selected: true);
-        AddScriptFilterTab(filterBar, "Scheduled", "\uE916", 166, selected: false);
-        AddScriptFilterTab(filterBar, "Webhooks", "\uE71B", 328, selected: false);
-        AddScriptFilterTab(filterBar, "Custom", "</>", 496, selected: false);
+        var selectedFilter = "All Scripts";
+        Action<string>? applyScriptFilter = null;
+        var filterControls = new Dictionary<string, (Control? Icon, Label Label, RoundedPanel Underline)>();
+        filterControls["All Scripts"] = AddScriptFilterTab(filterBar, "All Scripts", string.Empty, 28, selected: true, () => applyScriptFilter?.Invoke("All Scripts"));
+        filterControls["Scheduled"] = AddScriptFilterTab(filterBar, "Scheduled", "\uE916", 166, selected: false, () => applyScriptFilter?.Invoke("Scheduled"));
+        filterControls["Webhooks"] = AddScriptFilterTab(filterBar, "Webhooks", "\uE71B", 328, selected: false, () => applyScriptFilter?.Invoke("Webhooks"));
+        filterControls["Custom"] = AddScriptFilterTab(filterBar, "Custom", "</>", 496, selected: false, () => applyScriptFilter?.Invoke("Custom"));
 
         var scheduledCard = BuildScriptCard(
             "Scheduled Restart",
@@ -1365,13 +1368,36 @@ public sealed partial class MainForm : Form
         notice.Controls.Add(MakeLabel("Scripts run inside a sandbox with access to RCON and the server API. Review community scripts before enabling them on a live server.", 70, 22, 1100, 28, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, notice.FillColor));
         panel.Controls.Add(notice);
 
-        panel.Resize += (_, _) => LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice);
-        LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice);
+        void ApplyScriptFilter(string filter)
+        {
+            selectedFilter = filter;
+            foreach (var (name, controls) in filterControls)
+            {
+                var active = name.Equals(filter, StringComparison.Ordinal);
+                controls.Label.ForeColor = active ? TextMain : TextDim;
+                controls.Underline.Visible = active;
+                if (controls.Icon is ScriptIconPanel scriptIcon)
+                {
+                    scriptIcon.IconColor = active ? TextMain : TextDim;
+                    scriptIcon.Invalidate();
+                }
+                else if (controls.Icon is Label iconLabel)
+                {
+                    iconLabel.ForeColor = active ? TextMain : TextDim;
+                }
+            }
+            LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
+            Log("Scripts filter: " + filter + ".");
+        }
+        applyScriptFilter = ApplyScriptFilter;
+
+        panel.Resize += (_, _) => LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
+        LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
 
         return panel;
     }
 
-    private static void LayoutScriptsPage(Control panel, Control newScript, Control filterBar, Control scheduledCard, Control webhookCard, Control backupCard, Control customZone, Control notice)
+    private static void LayoutScriptsPage(Control panel, Control newScript, Control filterBar, Control scheduledCard, Control webhookCard, Control backupCard, Control customZone, Control notice, string filter)
     {
         var pageWidth = Math.Max(1000, panel.ClientSize.Width);
         const int margin = 18;
@@ -1388,29 +1414,35 @@ public sealed partial class MainForm : Form
         filterBar.Top = 128;
         filterBar.Width = pageWidth;
         filterBar.Height = 66;
+
+        scheduledCard.Visible = filter is "All Scripts" or "Scheduled";
+        backupCard.Visible = filter is "All Scripts" or "Scheduled";
+        webhookCard.Visible = filter is "All Scripts" or "Webhooks";
+        customZone.Visible = filter is "All Scripts" or "Custom";
+
         scheduledCard.Left = margin;
         scheduledCard.Top = 220;
         scheduledCard.Width = cardWidth;
         scheduledCard.Height = cardHeight;
-        webhookCard.Left = rightX;
+        webhookCard.Left = filter.Equals("Webhooks", StringComparison.Ordinal) ? margin : rightX;
         webhookCard.Top = 220;
         webhookCard.Width = cardWidth;
         webhookCard.Height = cardHeight;
-        backupCard.Left = margin;
-        backupCard.Top = 504;
+        backupCard.Left = filter.Equals("Scheduled", StringComparison.Ordinal) ? rightX : margin;
+        backupCard.Top = filter.Equals("Scheduled", StringComparison.Ordinal) ? 220 : 504;
         backupCard.Width = cardWidth;
         backupCard.Height = cardHeight;
-        customZone.Left = rightX;
-        customZone.Top = 504;
+        customZone.Left = filter.Equals("Custom", StringComparison.Ordinal) ? margin : rightX;
+        customZone.Top = filter.Equals("Custom", StringComparison.Ordinal) ? 220 : 504;
         customZone.Width = cardWidth;
         customZone.Height = cardHeight;
         notice.Left = 0;
-        notice.Top = 788;
+        notice.Top = filter.Equals("All Scripts", StringComparison.Ordinal) ? 788 : 504;
         notice.Width = pageWidth;
         notice.Height = 72;
     }
 
-    private static void AddScriptFilterTab(Control parent, string text, string icon, int x, bool selected)
+    private static (Control? Icon, Label Label, RoundedPanel Underline) AddScriptFilterTab(Control parent, string text, string icon, int x, bool selected, Action action)
     {
         var width = text switch
         {
@@ -1420,6 +1452,7 @@ public sealed partial class MainForm : Form
             _ => 104
         };
         var textLeft = string.IsNullOrEmpty(icon) ? x : x + 26;
+        Control? iconControl = null;
 
         if (!string.IsNullOrEmpty(icon))
         {
@@ -1429,25 +1462,32 @@ public sealed partial class MainForm : Form
                 var codeIcon = new ScriptIconPanel
                 {
                     Kind = ScriptIconKind.Code,
-                    IconColor = TextDim,
-                    BackColor = tabBack
+                    IconColor = selected ? TextMain : TextDim,
+                    BackColor = tabBack,
+                    Cursor = Cursors.Hand
                 };
                 codeIcon.SetBounds(x, 17, 22, 24);
+                codeIcon.Click += (_, _) => action();
                 parent.Controls.Add(codeIcon);
+                iconControl = codeIcon;
             }
             else
             {
-                var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, tabBack);
+                var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, selected ? TextMain : TextDim, ContentAlignment.MiddleCenter, tabBack);
                 iconLabel.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
+                iconLabel.Cursor = Cursors.Hand;
+                iconLabel.Click += (_, _) => action();
                 parent.Controls.Add(iconLabel);
+                iconControl = iconLabel;
             }
         }
 
         var labelBack = parent is RoundedPanel labelParent ? labelParent.FillColor : parent.BackColor;
         var label = MakeLabel(text, textLeft, 16, width, 32, 10.5F, FontStyle.Bold, selected ? TextMain : TextDim, ContentAlignment.MiddleLeft, labelBack);
+        label.Cursor = Cursors.Hand;
+        label.Click += (_, _) => action();
         parent.Controls.Add(label);
 
-        if (!selected) return;
         var underline = new RoundedPanel
         {
             Left = x,
@@ -1457,9 +1497,13 @@ public sealed partial class MainForm : Form
             Radius = 2,
             FillColor = Color.FromArgb(147, 82, 255),
             BorderColor = Color.FromArgb(147, 82, 255),
-            BackColor = parent is RoundedPanel underlineParent ? underlineParent.FillColor : parent.BackColor
+            BackColor = parent is RoundedPanel underlineParent ? underlineParent.FillColor : parent.BackColor,
+            Visible = selected
         };
+        underline.Cursor = Cursors.Hand;
+        underline.Click += (_, _) => action();
         parent.Controls.Add(underline);
+        return (iconControl, label, underline);
     }
 
     private RoundedPanel BuildScriptCard(string title, string subtitle, string description, string status, ScriptIconKind iconKind, bool enabled, int x, int y, int w, int h)
