@@ -695,44 +695,14 @@ public sealed partial class MainForm : Form
             Width = 164,
             Height = 150,
             Radius = 10,
-            FillColor = Color.FromArgb(34, 8, 12),
-            BorderColor = Color.FromArgb(55, 16, 25),
+            FillColor = SidebarBack,
+            BorderColor = SidebarBack,
             BackColor = SidebarBack
         };
-        if (LoadLogoImage() is { } logoImage)
-        {
-            logo.Controls.Add(new PictureBox
-            {
-                Left = 1,
-                Top = 1,
-                Width = logo.Width - 2,
-                Height = logo.Height - 2,
-                Image = logoImage,
-                SizeMode = PictureBoxSizeMode.Zoom,
-                BackColor = logo.FillColor
-            });
-        }
-        else
-        {
-            logo.Controls.Add(MakeLabel("VEIN", 0, 28, logo.Width, 42, 23, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, logo.FillColor));
-        }
-
-        var caption = new Label
-        {
-            Left = 0,
-            Top = 100,
-            Width = logo.Width,
-            Height = 30,
-            Text = "MOD MANAGER",
-            Font = new Font("Segoe UI", 8.6F, FontStyle.Bold),
-            ForeColor = TextMuted,
-            BackColor = Color.FromArgb(220, 8, 5, 6),
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-        logo.Controls.Add(caption);
-        caption.BringToFront();
+        logo.Controls.Add(MakeLabel("VEIN", 0, 28, logo.Width, 62, 38F, FontStyle.Bold, Color.White, ContentAlignment.MiddleCenter, SidebarBack));
+        logo.Controls.Add(MakeLabel("MOD MANAGER", 0, 98, logo.Width, 28, 10F, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, SidebarBack));
         _sidebar.Controls.Add(logo);
-        _sidebar.Controls.Add(Line(20, 244, SidebarWidth - 40));
+        _sidebar.Controls.Add(Line(20, 200, SidebarWidth - 40));
 
         _sidebarFooter = NewPanel(8, 12, 814, SidebarWidth - 24, 120);
         _sidebarFooter.FillColor = InnerBack;
@@ -867,7 +837,7 @@ public sealed partial class MainForm : Form
         _tabPages["Scripts"] = BuildScriptsTab();
         _tabPages["Log"] = BuildLogTab();
 
-        var y = 256;
+        var y = 202;
         foreach (var title in new[] { "Dashboard", "Setup", "Server Manager", "Mods", "Scripts", "Log" })
         {
             var button = NewSidebarTabButton(title, 14, y);
@@ -1319,8 +1289,10 @@ public sealed partial class MainForm : Form
         panel.BorderColor = AppBack;
         panel.FillColor = AppBack;
 
-        panel.Controls.Add(MakeLabel("Scripts", 0, 24, 150, 48, 26F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
-        panel.Controls.Add(NewPill("EXPERIMENTAL", 148, 34, 126, 30, Color.FromArgb(35, 24, 72)));
+        var experimental = NewPill("EXPERIMENTAL", 148, 34, 126, 30, Color.FromArgb(35, 24, 72));
+        experimental.BackColor = AppBack;
+        experimental.Radius = 15;
+        panel.Controls.Add(experimental);
         panel.Controls.Add(MakeLabel("Community automation for your server \u2014 scheduled tasks, webhooks and custom hooks.", 0, 82, 820, 30, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
 
         var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, OpenConfigFolder, main: true);
@@ -1386,8 +1358,8 @@ public sealed partial class MainForm : Form
         var notice = NewPanel(10, 0, 788, 1213, 72);
         notice.FillColor = Color.FromArgb(13, 14, 35);
         notice.BorderColor = Color.FromArgb(28, 35, 70);
-        var noticeIcon = MakeLabel("\uE946", 28, 20, 28, 28, 14, FontStyle.Regular, Color.FromArgb(255, 219, 76), ContentAlignment.MiddleCenter, notice.FillColor);
-        noticeIcon.Font = new Font("Segoe MDL2 Assets", 14F, FontStyle.Regular);
+        var noticeIcon = MakeLabel("\uD83D\uDCA1", 28, 20, 28, 28, 14, FontStyle.Regular, Color.FromArgb(255, 219, 76), ContentAlignment.MiddleCenter, notice.FillColor);
+        noticeIcon.Font = new Font("Segoe UI Emoji", 14F, FontStyle.Regular);
         notice.Controls.Add(noticeIcon);
         notice.Controls.Add(MakeLabel("Scripts run inside a sandbox with access to RCON and the server API. Review community scripts before enabling them on a live server.", 70, 22, 1100, 28, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, notice.FillColor));
         panel.Controls.Add(notice);
@@ -1450,12 +1422,14 @@ public sealed partial class MainForm : Form
 
         if (!string.IsNullOrEmpty(icon))
         {
-            var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, parent.BackColor);
+            var tabBack = parent is RoundedPanel roundedParent ? roundedParent.FillColor : parent.BackColor;
+            var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, tabBack);
             iconLabel.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
             parent.Controls.Add(iconLabel);
         }
 
-        var label = MakeLabel(text, textLeft, 16, width, 32, 10.5F, FontStyle.Bold, selected ? TextMain : TextDim, ContentAlignment.MiddleLeft, parent.BackColor);
+        var labelBack = parent is RoundedPanel labelParent ? labelParent.FillColor : parent.BackColor;
+        var label = MakeLabel(text, textLeft, 16, width, 32, 10.5F, FontStyle.Bold, selected ? TextMain : TextDim, ContentAlignment.MiddleLeft, labelBack);
         parent.Controls.Add(label);
 
         if (!selected) return;
@@ -1479,9 +1453,9 @@ public sealed partial class MainForm : Form
 
         var iconBox = NewPanel(8, 28, 28, 64, 64);
         iconBox.FillColor = Color.FromArgb(16, 23, 43);
-        iconBox.BorderColor = Color.FromArgb(38, 43, 84);
+        var iconColor = title.Equals("Discord Status Webhook", StringComparison.Ordinal) ? Color.FromArgb(255, 207, 64) : enabled ? TextMain : TextMuted;
+        var iconLabel = MakeLabel(icon, 0, 0, 64, 64, 20, FontStyle.Regular, iconColor, ContentAlignment.MiddleCenter, iconBox.FillColor);
         iconBox.BackColor = card.FillColor;
-        var iconLabel = MakeLabel(icon, 0, 0, 64, 64, 20, FontStyle.Regular, enabled ? TextMain : TextMuted, ContentAlignment.MiddleCenter, iconBox.FillColor);
         iconLabel.Font = new Font("Segoe UI Emoji", 20F, FontStyle.Regular);
         iconBox.Controls.Add(iconLabel);
 
@@ -4564,7 +4538,7 @@ public sealed partial class MainForm : Form
             ForeColor = TextMain,
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             IconText = SidebarIconFor(text),
-            IconFont = new Font("Segoe MDL2 Assets", 12F, FontStyle.Regular),
+            IconFont = text.Equals("Scripts", StringComparison.Ordinal) ? new Font("Segoe UI", 11F, FontStyle.Bold) : new Font("Segoe MDL2 Assets", 12F, FontStyle.Regular),
             ContentLeftPadding = 20,
             IconTextGap = 14,
             FlatStyle = FlatStyle.Flat
@@ -4577,7 +4551,7 @@ public sealed partial class MainForm : Form
         "Setup" => "\uE90F",
         "Server Manager" => "\uE968",
         "Mods" => "\uE713",
-        "Scripts" => "\uE943",
+        "Scripts" => "</>",
         "Log" => "\uE8FD",
         _ => string.Empty
     };
