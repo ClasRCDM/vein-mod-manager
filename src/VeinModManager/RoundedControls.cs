@@ -54,6 +54,21 @@ public class RoundedPanel : Panel
     }
 }
 
+public sealed class DashedRoundedPanel : RoundedPanel
+{
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        e.Graphics.Clear(VisualBackColor(Parent, BackColor));
+        using var path = RoundedRect(new Rectangle(1, 1, Width - 3, Height - 3), Radius);
+        using var fill = new SolidBrush(FillColor);
+        using var pen = new Pen(BorderColor, 1f) { DashStyle = DashStyle.Dash };
+        e.Graphics.FillPath(fill, path);
+        e.Graphics.DrawPath(pen, path);
+    }
+}
+
 public sealed class RedGlowPanel : RoundedPanel
 {
     public Color GlowColor { get; set; } = Color.FromArgb(125, 20, 28);
