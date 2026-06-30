@@ -694,7 +694,7 @@ public sealed partial class MainForm : Form
             Left = 28,
             Top = 58,
             Width = 164,
-            Height = 150,
+            Height = 136,
             BackColor = SidebarBack,
             GlowColor = Color.FromArgb(185, 24, 38),
             AccentColor = Color.FromArgb(185, 24, 38),
