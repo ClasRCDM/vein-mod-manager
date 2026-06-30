@@ -1289,11 +1289,6 @@ public sealed partial class MainForm : Form
         panel.FillColor = AppBack;
 
         panel.Controls.Add(MakeLabel("Scripts", 0, 24, 150, 48, 26F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
-        var experimental = NewPill("EXPERIMENTAL", 148, 34, 142, 30, Color.FromArgb(35, 24, 72));
-        experimental.BackColor = AppBack;
-        experimental.BorderColor = Color.FromArgb(88, 68, 180);
-        experimental.Radius = 15;
-        panel.Controls.Add(experimental);
         panel.Controls.Add(MakeLabel("Community automation for your server \u2014 scheduled tasks, webhooks and custom hooks.", 0, 82, 820, 30, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
 
         var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
