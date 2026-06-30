@@ -1296,7 +1296,7 @@ public sealed partial class MainForm : Form
         panel.Controls.Add(experimental);
         panel.Controls.Add(MakeLabel("Community automation for your server \u2014 scheduled tasks, webhooks and custom hooks.", 0, 82, 820, 30, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
 
-        var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, OpenConfigFolder, main: true);
+        var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
         newScript.FillColor = Color.FromArgb(126, 58, 242);
         newScript.HoverColor = Color.FromArgb(147, 82, 255);
         newScript.BorderColor = Color.FromArgb(167, 139, 250);
@@ -1502,8 +1502,22 @@ public sealed partial class MainForm : Form
         var divider = Line(28, h - 62, w - 56);
         var statusDot = MakeLabel("\u25CF", 28, h - 43, 16, 24, 10F, FontStyle.Regular, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, card.FillColor);
         var statusLabel = MakeLabel(status == "Active" ? "Active" : "Paused", 46, h - 42, 100, 24, 10F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, card.FillColor);
-        var editLabel = MakeLabel("Edit", w - 148, h - 42, 44, 24, 10F, FontStyle.Bold, Color.FromArgb(167, 139, 250), ContentAlignment.MiddleLeft, card.FillColor);
-        var runLabel = MakeLabel("Run now", w - 96, h - 42, 80, 24, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, card.FillColor);
+        var editLabel = MakeActionLabel("Edit", w - 148, h - 42, 44, 24, Color.FromArgb(167, 139, 250), () => ShowScriptEditorDialog(title, subtitle, description, enabled));
+        var runLabel = MakeActionLabel("Run now", w - 96, h - 42, 80, 24, TextMuted, () => ShowScriptRunDialog(title, subtitle, description));
+
+        void OpenEditor() => ShowScriptEditorDialog(title, subtitle, description, toggle.Checked);
+        card.Cursor = Cursors.Hand;
+        titleLabel.Cursor = Cursors.Hand;
+        descriptionLabel.Cursor = Cursors.Hand;
+        iconBox.Cursor = Cursors.Hand;
+        iconPanel.Cursor = Cursors.Hand;
+        card.Click += (_, _) => OpenEditor();
+        titleLabel.Click += (_, _) => OpenEditor();
+        subtitleLabel.Click += (_, _) => OpenEditor();
+        descriptionLabel.Click += (_, _) => OpenEditor();
+        iconBox.Click += (_, _) => OpenEditor();
+        iconPanel.Click += (_, _) => OpenEditor();
+        toggle.CheckedChanged += (_, _) => ShowScriptToggleDialog(title, toggle.Checked);
 
         card.Controls.Add(iconBox);
         card.Controls.Add(titleLabel);
@@ -1555,12 +1569,25 @@ public sealed partial class MainForm : Form
         plus.FillColor = Color.FromArgb(9, 14, 28);
         plus.BorderColor = Color.FromArgb(75, 55, 150);
         plus.BackColor = zone.FillColor;
-        plus.Controls.Add(MakeLabel("+", 0, 0, 54, 54, 21, FontStyle.Regular, Color.FromArgb(147, 82, 255), ContentAlignment.MiddleCenter, plus.FillColor));
+        var plusLabel = MakeLabel("+", 0, 0, 54, 54, 21, FontStyle.Regular, Color.FromArgb(147, 82, 255), ContentAlignment.MiddleCenter, plus.FillColor);
+        plus.Controls.Add(plusLabel);
         var titleLabel = MakeLabel("Add a custom script", 0, 128, w, 24, 11, FontStyle.Bold, TextMuted, ContentAlignment.MiddleCenter, zone.FillColor);
         var subtitleLabel = MakeLabel("Lua, Batch or PowerShell", 0, 156, w, 22, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, zone.FillColor);
         zone.Controls.Add(plus);
         zone.Controls.Add(titleLabel);
         zone.Controls.Add(subtitleLabel);
+
+        void OpenNewScript() => ShowNewScriptDialog();
+        zone.Cursor = Cursors.Hand;
+        plus.Cursor = Cursors.Hand;
+        plusLabel.Cursor = Cursors.Hand;
+        titleLabel.Cursor = Cursors.Hand;
+        subtitleLabel.Cursor = Cursors.Hand;
+        zone.Click += (_, _) => OpenNewScript();
+        plus.Click += (_, _) => OpenNewScript();
+        plusLabel.Click += (_, _) => OpenNewScript();
+        titleLabel.Click += (_, _) => OpenNewScript();
+        subtitleLabel.Click += (_, _) => OpenNewScript();
 
         void LayoutDropZone()
         {
@@ -4306,6 +4333,163 @@ public sealed partial class MainForm : Form
 
         popup.ShowDialog(this);
     }
+
+    private void ShowNewScriptDialog()
+    {
+        using var popup = NewScriptsDialog("New Script", 560, 420, out var shell);
+        shell.Controls.Add(MakeLabel("New Script", 28, 24, 260, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel("Create a local draft in the selected mod Scripts folder.", 30, 62, 430, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel("Name", 30, 104, 140, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        var nameBox = NewTextBox(30, 130, 470, 36);
+        nameBox.Text = "custom-script";
+        shell.Controls.Add(nameBox);
+        shell.Controls.Add(MakeLabel("Type", 30, 178, 140, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        var typeCombo = NewCombo(30, 204, 220, new[] { "Lua", "Batch", "PowerShell" });
+        shell.Controls.Add(typeCombo);
+        shell.Controls.Add(MakeLabel("Trigger", 280, 178, 140, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        var triggerBox = NewTextBox(280, 204, 220, 36);
+        triggerBox.Text = "Manual";
+        shell.Controls.Add(triggerBox);
+        shell.Controls.Add(MakeWrappedLabel("The draft is created as a safe starter file. You can edit it manually before running it on a live server.", 30, 262, 470, 54, 10.5F, FontStyle.Regular, TextDim, PanelBack));
+        shell.Controls.Add(MakeButton("Create Draft", 280, 326, 138, 42, () =>
+        {
+            if (CreateScriptDraft(nameBox.Text, Convert.ToString(typeCombo.SelectedItem) ?? "Lua")) popup.Close();
+        }, main: true));
+        shell.Controls.Add(MakeButton("Open Folder", 430, 326, 110, 42, OpenConfigFolder));
+        popup.ShowDialog(this);
+    }
+
+    private void ShowScriptEditorDialog(string title, string subtitle, string description, bool enabled)
+    {
+        using var popup = NewScriptsDialog(title, 600, 462, out var shell);
+        shell.Controls.Add(MakeLabel(title, 28, 24, 360, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel(subtitle, 30, 62, 480, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel(description, 30, 102, 520, 56, 11F, FontStyle.Regular, TextMuted, PanelBack));
+        shell.Controls.Add(MakeLabel("Script name", 30, 178, 160, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        var nameBox = NewTextBox(30, 204, 260, 36);
+        nameBox.Text = title;
+        shell.Controls.Add(nameBox);
+        shell.Controls.Add(MakeLabel("Runtime", 320, 178, 160, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        var typeCombo = NewCombo(320, 204, 220, new[] { "Lua", "Batch", "PowerShell" });
+        var runtime = subtitle.Split('-', 2)[0].Trim();
+        var runtimeIndex = Math.Max(0, typeCombo.Items.IndexOf(runtime));
+        typeCombo.SelectedIndex = runtimeIndex;
+        shell.Controls.Add(typeCombo);
+        shell.Controls.Add(MakeLabel("Current state", 30, 260, 160, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel(enabled ? "Enabled" : "Paused", 30, 286, 160, 24, 11F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel("Save Draft writes a local editable script file. Runtime execution still stays behind the Run Now confirmation window.", 30, 326, 520, 42, 10.5F, FontStyle.Regular, TextDim, PanelBack));
+        shell.Controls.Add(MakeButton("Save Draft", 318, 384, 118, 42, () =>
+        {
+            if (CreateScriptDraft(nameBox.Text, Convert.ToString(typeCombo.SelectedItem) ?? runtime)) popup.Close();
+        }, main: true));
+        shell.Controls.Add(MakeButton("Run Now", 450, 384, 100, 42, () => ShowScriptRunDialog(title, subtitle, description)));
+        popup.ShowDialog(this);
+    }
+
+    private void ShowScriptRunDialog(string title, string subtitle, string description)
+    {
+        using var popup = NewScriptsDialog("Run Script", 540, 340, out var shell);
+        shell.Controls.Add(MakeLabel("Run " + title, 28, 24, 420, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel(subtitle, 30, 62, 420, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel(description, 30, 108, 460, 70, 11F, FontStyle.Regular, TextMuted, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel("Review scripts before running them on a live server. This action records the request and keeps execution explicit.", 30, 200, 460, 48, 10.5F, FontStyle.Regular, TextDim, PanelBack));
+        shell.Controls.Add(MakeButton("Run Now", 294, 262, 104, 42, () =>
+        {
+            Log("Script run requested: " + title + ".");
+            popup.Close();
+        }, main: true));
+        shell.Controls.Add(MakeButton("Edit", 412, 262, 82, 42, () => ShowScriptEditorDialog(title, subtitle, description, true)));
+        popup.ShowDialog(this);
+    }
+
+    private void ShowScriptToggleDialog(string title, bool enabled)
+    {
+        using var popup = NewScriptsDialog("Script Status", 460, 260, out var shell);
+        shell.Controls.Add(MakeLabel(title, 28, 24, 340, 34, 18, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel(enabled ? "This automation is now marked active for the local manager view." : "This automation is now paused for the local manager view.", 30, 78, 380, 58, 11F, FontStyle.Regular, TextMuted, PanelBack));
+        shell.Controls.Add(MakeButton("OK", 304, 160, 92, 42, () => popup.Close(), main: true));
+        Log((enabled ? "Enabled script: " : "Paused script: ") + title + ".");
+        popup.ShowDialog(this);
+    }
+
+    private Form NewScriptsDialog(string title, int width, int height, out RoundedPanel shell)
+    {
+        var popup = new Form
+        {
+            Text = title,
+            ClientSize = new Size(width, height),
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            StartPosition = FormStartPosition.CenterParent,
+            BackColor = AppBack,
+            ForeColor = TextMain,
+            Font = new Font("Segoe UI", 11F, FontStyle.Regular),
+            ShowInTaskbar = false
+        };
+        popup.Shown += (_, _) => UseDarkTitleBar(popup.Handle);
+        shell = NewPanel(14, 18, 18, width - 36, height - 36);
+        shell.BackColor = AppBack;
+        popup.Controls.Add(shell);
+        return popup;
+    }
+
+    private bool CreateScriptDraft(string name, string type)
+    {
+        var modFolder = _modFolderBox?.Text.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(modFolder) || !Directory.Exists(modFolder))
+        {
+            MessageBox.Show(this, "Select a valid ItemAndContainerModifier folder before creating script drafts.", "Scripts", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            LogError("Select a valid mod folder before creating script drafts.");
+            return false;
+        }
+
+        var scripts = Path.Combine(modFolder, "Scripts");
+
+        Directory.CreateDirectory(scripts);
+        var safeName = SafeScriptFileName(name);
+        var extension = ScriptExtension(type);
+        var path = UniqueScriptPath(scripts, safeName, extension);
+        File.WriteAllText(path, ScriptDraftContent(type, safeName));
+        Log("Created script draft: " + path);
+        return true;
+    }
+
+    private static string SafeScriptFileName(string name)
+    {
+        var safe = Regex.Replace(name.Trim(), @"[^A-Za-z0-9._-]+", "-").Trim('-', '.', '_');
+        return string.IsNullOrWhiteSpace(safe) ? "custom-script" : safe;
+    }
+
+    private static string ScriptExtension(string type) => type switch
+    {
+        "Batch" => ".bat",
+        "PowerShell" => ".ps1",
+        _ => ".lua"
+    };
+
+    private static string UniqueScriptPath(string folder, string name, string extension)
+    {
+        var path = Path.Combine(folder, name + extension);
+        if (!File.Exists(path)) return path;
+        var suffix = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        return Path.Combine(folder, name + "-" + suffix + extension);
+    }
+
+    private static Label MakeActionLabel(string text, int x, int y, int w, int h, Color color, Action action)
+    {
+        var label = MakeLabel(text, x, y, w, h, 10F, FontStyle.Bold, color, ContentAlignment.MiddleLeft, Color.Transparent);
+        label.Cursor = Cursors.Hand;
+        label.Click += (_, _) => action();
+        return label;
+    }
+
+    private static string ScriptDraftContent(string type, string name) => type switch
+    {
+        "Batch" => "@echo off\r\necho VEIN script draft: " + name + "\r\n",
+        "PowerShell" => "Write-Host \"VEIN script draft: " + name + "\"\r\n",
+        _ => "print(\"VEIN script draft: " + name + "\")\n"
+    };
 
     private static RoundedPanel NewPresetCard(string title, string description, int x, int y, Action action)
     {
