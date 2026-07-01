@@ -3,6 +3,7 @@ using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.ComponentModel;
 
 namespace VEIN_Item_And_Container_Modifier;
@@ -100,6 +101,16 @@ public sealed partial class MainForm : Form
     private ToggleSwitch _backupBeforeUploadToggle = null!;
     private ToggleSwitch _backupBeforeRestartToggle = null!;
     private ListBox _recentBackupsList = null!;
+    private TextBox _windowsSaveDirectoryBox = null!;
+    private TextBox _windowsBackupDirectoryBox = null!;
+    private TextBox _windowsLogFileBox = null!;
+    private TextBox _shutdownBudgetBox = null!;
+    private TextBox _forceIdleBox = null!;
+    private TextBox _extendIntervalBox = null!;
+    private TextBox _startupWatchBox = null!;
+    private TextBox _corruptionThresholdBox = null!;
+    private ToggleSwitch _autoRevertToggle = null!;
+    private ToggleSwitch _logRotatesToggle = null!;
     private ListBox _modParityList = null!;
     private CheckBox _modParityAllowExtraMods = null!;
     private ThemedComboBox _modParityEnforcementCombo = null!;
@@ -2150,19 +2161,24 @@ public sealed partial class MainForm : Form
 
     private Panel BuildServerBackupsPage()
     {
-        var page = new Panel { BackColor = PanelBack };
+        var page = new Panel
+        {
+            BackColor = PanelBack,
+            AutoScroll = true,
+            AutoScrollMargin = new Size(0, 18)
+        };
         _serverBackupsPane = page;
         var section = NewServerSection("Backups", 0, 0, 456, 244);
         page.Controls.Add(section);
-        section.Controls.Add(MakeButton("Backup now", 22, 46, 140, 42, BackupSelectedServerConfig, main: true));
+        section.Controls.Add(MakeButton("Backup config now", 22, 46, 148, 42, BackupSelectedServerConfig, main: true));
         _backupBeforeSaveToggle = AddToggleRow(section, "Backup before save", 190, 46, isChecked: true);
         _backupBeforeUploadToggle = AddToggleRow(section, "Backup before upload", 190, 86, isChecked: true);
-        _backupBeforeRestartToggle = AddToggleRow(section, "Backup before restart", 190, 126, isChecked: true);
+        _backupBeforeRestartToggle = AddToggleRow(section, "Verified save backup", 190, 126, isChecked: true);
         _recentBackupsList = new ListBox
         {
             Left = 22,
             Top = 104,
-            Width = 140,
+            Width = 148,
             Height = 72,
             BackColor = InnerBack,
             ForeColor = TextMuted,
@@ -2171,10 +2187,31 @@ public sealed partial class MainForm : Form
         };
         _recentBackupsList.Items.Add("No backups yet");
         section.Controls.Add(_recentBackupsList);
-        var restore = NewSmallButton("Restore backup", 22, 188, 140, 32);
-        restore.Enabled = false;
-        AddTip(restore, "Disabled until restore can be implemented with validation and rollback checks.");
-        section.Controls.Add(restore);
+
+        var paths = NewServerSection("Safe Restart Paths", 476, 0, 456, 244);
+        page.Controls.Add(paths);
+        _windowsSaveDirectoryBox = AddCompactTextField(paths, "Save directory", 22, 54, 386, "");
+        _windowsBackupDirectoryBox = AddCompactTextField(paths, "Verified backup directory", 22, 106, 386, "");
+        _windowsLogFileBox = AddCompactTextField(paths, "Server log file", 22, 158, 386, "");
+        paths.Controls.Add(MakeButton("Use Defaults", 22, 198, 118, 34, FillWindowsSafetyDefaultsFromUi));
+        paths.Controls.Add(MakeButton("Scan Log", 156, 198, 118, 34, ScanWindowsCorruptionLogFromUi));
+        paths.Controls.Add(MakeButton("Restore Save", 290, 198, 118, 34, RestoreWindowsVerifiedBackupFromUi));
+
+        var parameters = NewServerSection("Safe Restart Parameters", 0, 264, 932, 126);
+        parameters.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        page.Controls.Add(parameters);
+        _shutdownBudgetBox = AddCompactTextField(parameters, "Budget", 22, 58, 80, "60", numeric: true);
+        _forceIdleBox = AddCompactTextField(parameters, "Idle force", 122, 58, 80, "20", numeric: true);
+        _extendIntervalBox = AddCompactTextField(parameters, "Extend", 222, 58, 80, "15", numeric: true);
+        _startupWatchBox = AddCompactTextField(parameters, "Watch", 322, 58, 80, "90", numeric: true);
+        _corruptionThresholdBox = AddCompactTextField(parameters, "Threshold", 422, 58, 80, "25", numeric: true);
+        _autoRevertToggle = AddToggleRow(parameters, "Auto revert corrupt load", 548, 56, isChecked: false);
+        _logRotatesToggle = AddToggleRow(parameters, "Log rotates per launch", 724, 56, isChecked: true);
+        AddTip(_windowsSaveDirectoryBox, "Directory watched during shutdown and mirrored only after a verified save write.");
+        AddTip(_windowsBackupDirectoryBox, "Single last-known-good save mirror used for rollback.");
+        AddTip(_windowsLogFileBox, "VEIN log scanned for Tried to load dynamic component during startup.");
+        AddTip(_autoRevertToggle, "When enabled, corrupt startup loads restore the verified backup without prompting.");
+        AddTip(_logRotatesToggle, "Turn off only if Vein.log appends across launches instead of rotating per boot.");
         return page;
     }
 
@@ -2745,6 +2782,102 @@ public sealed partial class MainForm : Form
             _windowsHttpApiPortBox,
             _windowsSuperAdminsBox);
     }
+    private RestartSafetySettings BuildRestartSafetySettingsFromUi()
+    {
+        var defaults = RestartSafetyService.CreateDefaultWindowsSettings(_windowsServerFolderBox.Text.Trim());
+        return defaults with
+        {
+            SaveDirectory = PathTextOrDefault(_windowsSaveDirectoryBox, defaults.SaveDirectory),
+            BackupDirectory = PathTextOrDefault(_windowsBackupDirectoryBox, defaults.BackupDirectory),
+            LogFilePath = PathTextOrDefault(_windowsLogFileBox, defaults.LogFilePath),
+            ShutdownBudgetSeconds = ReadPositiveNumber(_shutdownBudgetBox.Text, "Shutdown budget", 1, 3600),
+            ForceIdleSeconds = ReadPositiveNumber(_forceIdleBox.Text, "Force-idle threshold", 1, 3600),
+            ExtendIntervalSeconds = ReadPositiveNumber(_extendIntervalBox.Text, "Extend interval", 1, 3600),
+            StartupWatchSeconds = ReadPositiveNumber(_startupWatchBox.Text, "Startup watch window", 1, 3600),
+            CorruptionThreshold = ReadPositiveNumber(_corruptionThresholdBox.Text, "Corruption threshold", 1, 100000),
+            AutoRevert = _autoRevertToggle.Checked,
+            LogRotatesPerLaunch = _logRotatesToggle.Checked
+        };
+    }
+
+    private static string PathTextOrDefault(TextBox box, string fallback)
+    {
+        var text = box.Text.Trim();
+        return string.IsNullOrWhiteSpace(text) ? fallback : text;
+    }
+
+    private void FillWindowsSafetyDefaultsFromUi()
+    {
+        try
+        {
+            var defaults = RestartSafetyService.CreateDefaultWindowsSettings(_windowsServerFolderBox.Text.Trim());
+            if (string.IsNullOrWhiteSpace(defaults.ServerFolderPath))
+            {
+                SetServerManagerError("Select a Windows server folder before filling safe restart defaults.");
+                return;
+            }
+
+            _windowsSaveDirectoryBox.Text = defaults.SaveDirectory;
+            _windowsBackupDirectoryBox.Text = defaults.BackupDirectory;
+            _windowsLogFileBox.Text = defaults.LogFilePath;
+            _shutdownBudgetBox.Text = defaults.ShutdownBudgetSeconds.ToString(CultureInfo.InvariantCulture);
+            _forceIdleBox.Text = defaults.ForceIdleSeconds.ToString(CultureInfo.InvariantCulture);
+            _extendIntervalBox.Text = defaults.ExtendIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+            _startupWatchBox.Text = defaults.StartupWatchSeconds.ToString(CultureInfo.InvariantCulture);
+            _corruptionThresholdBox.Text = defaults.CorruptionThreshold.ToString(CultureInfo.InvariantCulture);
+            _autoRevertToggle.Checked = defaults.AutoRevert;
+            _logRotatesToggle.Checked = defaults.LogRotatesPerLaunch;
+            LogServer("Safe restart defaults filled from the selected Windows server folder.");
+        }
+        catch (Exception ex)
+        {
+            SetServerManagerError("Safe restart defaults failed: " + ex.Message);
+        }
+    }
+
+    private void ScanWindowsCorruptionLogFromUi()
+    {
+        try
+        {
+            var settings = BuildRestartSafetySettingsFromUi();
+            var result = RestartSafetyService.CountStartupCorruption(settings, 0);
+            if (result.IsCorrupt)
+            {
+                SetServerStatus("Corrupt Load", Red);
+                LogServer(string.Create(CultureInfo.InvariantCulture, $"Corruption fingerprint detected: {result.CorruptionCount}/{result.Threshold} dynamic-load errors."), Red);
+            }
+            else
+            {
+                LogServer(string.Create(CultureInfo.InvariantCulture, $"Corruption scan clean: {result.CorruptionCount}/{result.Threshold} dynamic-load errors."));
+            }
+        }
+        catch (Exception ex)
+        {
+            SetServerManagerError("Log scan failed: " + ex.Message);
+        }
+    }
+
+    private void RestoreWindowsVerifiedBackupFromUi()
+    {
+        try
+        {
+            var settings = BuildRestartSafetySettingsFromUi();
+            var confirm = MessageBox.Show(this, "Restore the verified backup over the current save directory?", "Restore VEIN save backup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (confirm != DialogResult.Yes)
+            {
+                LogServer("Restore cancelled. Backup left untouched.");
+                return;
+            }
+
+            RestartSafetyService.RestoreVerifiedBackup(settings);
+            SetLastServerBackup(DateTime.Now);
+            LogServer("Restored verified save backup: " + settings.BackupDirectory);
+        }
+        catch (Exception ex)
+        {
+            SetServerManagerError("Restore failed: " + ex.Message);
+        }
+    }
 
     private static int ReadPort(string raw, string label)
     {
@@ -2820,9 +2953,16 @@ public sealed partial class MainForm : Form
 
     private void StartWindowsServerFromUi()
     {
+        StartWindowsServerFromUi(monitorCorruption: true);
+    }
+
+    private void StartWindowsServerFromUi(bool monitorCorruption)
+    {
         try
         {
             var profile = BuildWindowsProfileFromUi();
+            var settings = BuildRestartSafetySettingsFromUi();
+            var logOffset = RestartSafetyService.GetStartupLogOffset(settings);
             var process = ServerManagerService.StartWindowsServer(profile.ServerFolderPath);
             if (process == null)
             {
@@ -2833,6 +2973,10 @@ public sealed partial class MainForm : Form
             TrackWindowsServerProcess(process);
             SetServerStatus("Running", Green);
             LogServer("Started Windows VEIN server.");
+            if (monitorCorruption)
+            {
+                BeginStartupCorruptionWatch(process, settings, logOffset, attempt: 0);
+            }
         }
         catch (Exception ex)
         {
@@ -2842,16 +2986,7 @@ public sealed partial class MainForm : Form
 
     private void RestartWindowsServerFromUi()
     {
-        try
-        {
-            BackupWindowsConfigBeforeRestartIfNeeded();
-            StopWindowsServer();
-            StartWindowsServerFromUi();
-        }
-        catch (Exception ex)
-        {
-            SetServerManagerError("Restart failed: " + ex.Message);
-        }
+        StopWindowsServerSafelyFromUi(restartAfter: true, skipBackup: false, restoreBeforeRestart: false, monitorAfterRestart: true);
     }
 
     private void TestLinuxConnectionFromUi()
@@ -3071,24 +3206,67 @@ public sealed partial class MainForm : Form
 
     private void StopWindowsServer()
     {
+        StopWindowsServerSafelyFromUi(restartAfter: false, skipBackup: false, restoreBeforeRestart: false, monitorAfterRestart: false);
+    }
+
+    private void StopWindowsServerSafelyFromUi(bool restartAfter, bool skipBackup, bool restoreBeforeRestart, bool monitorAfterRestart)
+    {
         try
         {
+            var settings = BuildRestartSafetySettingsFromUi();
             if (!WindowsServerIsRunning())
             {
                 SetServerStatus("Stopped", Orange);
                 LogServer("No manager-started Windows server process is currently running.");
+                if (restoreBeforeRestart)
+                {
+                    RestartSafetyService.RestoreVerifiedBackup(settings);
+                    LogServer("Restored verified save backup: " + settings.BackupDirectory);
+                }
+
+                if (restartAfter)
+                {
+                    StartWindowsServerFromUi(monitorAfterRestart);
+                }
+
                 return;
             }
 
             var process = _windowsServerProcess!;
-            if (!process.CloseMainWindow() || !process.WaitForExit(5000))
+            var createBackup = !skipBackup && _backupBeforeRestartToggle.Checked && Directory.Exists(settings.SaveDirectory);
+            SetServerStatus("Stopping", Orange);
+            LogServer(skipBackup ? "Stopping Windows VEIN server without backup for rollback." : "Stopping Windows VEIN server safely.");
+            if (!createBackup && !skipBackup)
             {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit(5000);
+                LogServer("Verified save backup skipped because the save directory was not found or the toggle is off.", Orange);
             }
 
-            SetServerStatus("Stopped", Orange);
-            LogServer("Stopped Windows VEIN server.");
+            _ = Task.Run(() =>
+                {
+                    var result = RestartSafetyService.StopWindowsServerSafely(process, settings, createBackup);
+                    var restored = false;
+                    if (restoreBeforeRestart)
+                    {
+                        RestartSafetyService.RestoreVerifiedBackup(settings);
+                        restored = true;
+                    }
+
+                    return (Result: result, Restored: restored);
+                })
+                .ContinueWith(task =>
+                {
+                    if (IsDisposed) return;
+                    BeginInvoke(() =>
+                    {
+                        if (task.IsFaulted)
+                        {
+                            SetServerManagerError("Safe stop failed: " + (task.Exception?.GetBaseException().Message ?? "unknown error"));
+                            return;
+                        }
+
+                        CompleteWindowsSafeStop(task.Result.Result, task.Result.Restored, restartAfter, monitorAfterRestart, settings);
+                    });
+                });
         }
         catch (Exception ex)
         {
@@ -3096,20 +3274,76 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void BackupWindowsConfigBeforeRestartIfNeeded()
+    private void CompleteWindowsSafeStop(SafeShutdownResult result, bool restored, bool restartAfter, bool monitorAfterRestart, RestartSafetySettings settings)
     {
-        if (!_backupBeforeRestartToggle.Checked) return;
-
-        var configPath = ServerManagerService.ResolveWindowsConfigPath(_windowsServerFolderBox.Text.Trim());
-        if (!File.Exists(configPath))
+        SetServerStatus("Stopped", result.WasForced ? Red : Orange);
+        LogServer(result.Message, result.SaveVerified ? Green : Orange);
+        if (result.WasForced)
         {
-            LogServer("No Windows server config found to backup before restart.");
+            LogServer("Windows server had to be force-killed after save activity went idle.", Red);
+        }
+
+        if (result.BackupCreated && !string.IsNullOrWhiteSpace(result.BackupDirectory))
+        {
+            AddRecentBackup(result.BackupDirectory);
+            LogServer("Verified save backup refreshed: " + result.BackupDirectory);
+        }
+
+        if (restored)
+        {
+            LogServer("Restored verified save backup before relaunch: " + settings.BackupDirectory, Green);
+        }
+
+        if (restartAfter)
+        {
+            StartWindowsServerFromUi(monitorAfterRestart);
+        }
+    }
+
+    private void BeginStartupCorruptionWatch(Process process, RestartSafetySettings settings, long logOffset, int attempt)
+    {
+        LogServer(string.Create(CultureInfo.InvariantCulture, $"Watching startup log for {settings.StartupWatchSeconds}s; threshold {settings.CorruptionThreshold}."));
+        _ = Task.Run(() => RestartSafetyService.WatchStartupForCorruption(settings, logOffset))
+            .ContinueWith(task =>
+            {
+                if (IsDisposed) return;
+                BeginInvoke(() =>
+                {
+                    if (task.IsFaulted)
+                    {
+                        SetServerManagerError("Startup corruption check failed: " + (task.Exception?.GetBaseException().Message ?? "unknown error"));
+                        return;
+                    }
+
+                    CompleteStartupCorruptionWatch(process, settings, task.Result, attempt);
+                });
+            });
+    }
+
+    private void CompleteStartupCorruptionWatch(Process process, RestartSafetySettings settings, StartupCorruptionCheckResult result, int attempt)
+    {
+        if (!result.IsCorrupt)
+        {
+            LogServer(string.Create(CultureInfo.InvariantCulture, $"Startup corruption check clean: {result.CorruptionCount}/{result.Threshold}."));
             return;
         }
 
-        var backupPath = ServerManagerService.CreateServerConfigBackup(configPath);
-        AddRecentBackup(backupPath);
-        LogServer("Backup before restart created: " + backupPath);
+        SetServerStatus("Corrupt Load", Red);
+        LogServer(string.Create(CultureInfo.InvariantCulture, $"Corruption detected on startup: {result.CorruptionCount}/{result.Threshold} dynamic-load errors."), Red);
+        var revert = settings.AutoRevert;
+        if (!revert)
+        {
+            var answer = MessageBox.Show(this, "VEIN reported a corrupt startup load. Revert to the verified backup and relaunch?", "VEIN save corruption detected", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            revert = answer == DialogResult.Yes;
+        }
+
+        if (!revert)
+        {
+            LogServer("Operator kept current save. Verified backup left untouched.", Orange);
+            return;
+        }
+
+        StopWindowsServerSafelyFromUi(restartAfter: true, skipBackup: true, restoreBeforeRestart: true, monitorAfterRestart: false);
     }
 
     private void AddRecentBackup(string backupPath)
@@ -3121,7 +3355,10 @@ public sealed partial class MainForm : Form
             _recentBackupsList.Items.Clear();
         }
 
-        var backupName = Path.GetFileName(Path.GetDirectoryName(backupPath)) ?? Path.GetFileName(backupPath);
+        var trimmed = backupPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var backupName = Directory.Exists(backupPath)
+            ? Path.GetFileName(trimmed)
+            : Path.GetFileName(Path.GetDirectoryName(backupPath)) ?? Path.GetFileName(backupPath);
         _recentBackupsList.Items.Insert(0, backupName);
         RefreshDashboard();
     }

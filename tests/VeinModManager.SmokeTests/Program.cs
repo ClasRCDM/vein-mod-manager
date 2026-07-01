@@ -23,6 +23,7 @@ internal static class SmokeTests
     {
         SmokeWorkflow_LoadsAppliesBacksUpAndInstallsUiConfig();
         ServerManager_GeneratesSafeProfilesConfigsAndHelperPackage();
+        SafeRestart_VerifiesBacksUpDetectsAndRestores();
         ModParity_BuildsPackageAndInstallsWindowsServerMod();
         CreateBackup_ConsecutiveCallsUseUniqueFolders();
         ApplyConfig_ReplacesMalformedExistingUiConfig();
@@ -166,6 +167,70 @@ internal static class SmokeTests
             var sanitizedConfigPath = ServerManagerService.WriteWindowsServerConfig(injectedProfile, backupBeforeSave: true);
             AssertFileContains(sanitizedConfigPath, "ServerName=Good Server InjectedSetting=true", "sanitized Windows server config");
             AssertFileDoesNotContain(sanitizedConfigPath, "\nInjectedSetting=true", "Windows server config newline injection prevention");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(testRoot);
+        }
+    }
+
+    private static void SafeRestart_VerifiesBacksUpDetectsAndRestores()
+    {
+        var testRoot = CreateTempRoot();
+
+        try
+        {
+            var serverRoot = Path.Combine(testRoot, "WindowsServer");
+            var settings = RestartSafetyService.CreateDefaultWindowsSettings(serverRoot);
+            Directory.CreateDirectory(settings.SaveDirectory);
+            Directory.CreateDirectory(Path.GetDirectoryName(settings.LogFilePath)!);
+            var saveFile = Path.Combine(settings.SaveDirectory, "World", "cell-a.sav");
+            Directory.CreateDirectory(Path.GetDirectoryName(saveFile)!);
+            File.WriteAllText(saveFile, "old-save");
+            var shutdownStart = DateTime.UtcNow;
+            File.SetLastWriteTimeUtc(saveFile, shutdownStart.AddSeconds(-5));
+
+            var unverified = RestartSafetyService.TryCreateVerifiedBackup(settings, shutdownStart);
+            AssertEqual(false, unverified.SaveVerified, "unverified save must not verify");
+            AssertEqual(false, unverified.BackupCreated, "unverified save must not backup");
+            AssertTrue(!Directory.Exists(settings.BackupDirectory), "unverified backup should not create mirror");
+
+            File.WriteAllText(saveFile, "good-save");
+            File.SetLastWriteTimeUtc(saveFile, shutdownStart.AddSeconds(5));
+            var verified = RestartSafetyService.TryCreateVerifiedBackup(settings, shutdownStart);
+            AssertEqual(true, verified.SaveVerified, "verified save must verify");
+            AssertEqual(true, verified.BackupCreated, "verified save must backup");
+            AssertFileContains(Path.Combine(settings.BackupDirectory, "World", "cell-a.sav"), "good-save", "verified save mirror");
+
+            var staleFile = Path.Combine(settings.BackupDirectory, "stale.sav");
+            File.WriteAllText(staleFile, "stale");
+            File.Delete(saveFile);
+            var replacementSave = Path.Combine(settings.SaveDirectory, "World", "cell-b.sav");
+            File.WriteAllText(replacementSave, "new-good-save");
+            File.SetLastWriteTimeUtc(replacementSave, shutdownStart.AddSeconds(10));
+            var remirrored = RestartSafetyService.TryCreateVerifiedBackup(settings, shutdownStart);
+            AssertEqual(true, remirrored.BackupCreated, "remirror after verified save");
+            AssertTrue(!File.Exists(staleFile), "mirror should remove stale backup files");
+            AssertFileContains(Path.Combine(settings.BackupDirectory, "World", "cell-b.sav"), "new-good-save", "replacement save mirror");
+
+            File.WriteAllText(replacementSave, "corrupt-current-save");
+            RestartSafetyService.RestoreVerifiedBackup(settings);
+            AssertFileContains(replacementSave, "new-good-save", "restore should overwrite corrupt current save");
+
+            File.WriteAllText(settings.LogFilePath, "old " + RestartSafetyService.CorruptionFingerprint + Environment.NewLine);
+            var bootOffset = new FileInfo(settings.LogFilePath).Length;
+            File.AppendAllLines(settings.LogFilePath, Enumerable.Repeat("LogVeinSaveGame: Error: " + RestartSafetyService.CorruptionFingerprint, 26));
+            var appendLogSettings = settings with { CorruptionThreshold = 25, LogRotatesPerLaunch = false, StartupWatchSeconds = 0 };
+            var scoped = RestartSafetyService.CountStartupCorruption(appendLogSettings, bootOffset);
+            AssertEqual(26, scoped.CorruptionCount, "boot-scoped corruption count");
+            AssertEqual(true, scoped.IsCorrupt, "boot-scoped corrupt load detection");
+            var watched = RestartSafetyService.WatchStartupForCorruption(appendLogSettings, bootOffset);
+            AssertEqual(true, watched.IsCorrupt, "startup watch corrupt load detection");
+
+            AssertThrowsContains<InvalidOperationException>(
+                () => RestartSafetyService.MirrorDirectory(settings.SaveDirectory, Path.Combine(settings.SaveDirectory, "NestedBackup")),
+                "Backup directory cannot be inside the save directory",
+                "nested backup rejection");
         }
         finally
         {
