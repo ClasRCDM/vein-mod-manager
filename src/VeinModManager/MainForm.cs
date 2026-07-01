@@ -432,8 +432,6 @@ public sealed partial class MainForm : Form
         DrawPreviewText(graphics, "System Online", 50, 944, 8.5F, FontStyle.Bold, Green, width: 150);
 
         DrawPreviewText(graphics, "Scripts", ContentLeft, 96, 26, FontStyle.Bold, TextMain);
-        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 148, 106, 142, 30), 15, Color.FromArgb(35, 24, 72), Color.FromArgb(88, 68, 180));
-        DrawPreviewText(graphics, "EXPERIMENTAL", ContentLeft + 164, 113, 9F, FontStyle.Bold, Color.FromArgb(167, 139, 250), width: 112);
         DrawPreviewText(graphics, "Community automation for your server — scheduled tasks, webhooks and custom hooks.", ContentLeft + 2, 152, 12.5F, FontStyle.Regular, TextDim);
         DrawPreviewPanel(graphics, new Rectangle(ContentLeft, 198, 1213, 66), 10, Color.FromArgb(8, 13, 27), BorderSoft);
         DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 18, 290, 574, 255), 12, Color.FromArgb(11, 18, 34), Color.FromArgb(22, 31, 52));
@@ -1285,11 +1283,6 @@ public sealed partial class MainForm : Form
         panel.FillColor = AppBack;
 
         panel.Controls.Add(MakeLabel("Scripts", 0, 24, 150, 48, 26F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
-        var experimental = NewPill("EXPERIMENTAL", 148, 34, 142, 30, Color.FromArgb(35, 24, 72));
-        experimental.BackColor = AppBack;
-        experimental.BorderColor = Color.FromArgb(88, 68, 180);
-        experimental.Radius = 15;
-        panel.Controls.Add(experimental);
         panel.Controls.Add(MakeLabel("Community automation for your server \u2014 scheduled tasks, webhooks and custom hooks.", 0, 82, 820, 30, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
 
         var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
