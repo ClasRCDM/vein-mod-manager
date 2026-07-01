@@ -326,6 +326,8 @@ public sealed class RoundedButton : Button
     public Font? IconFont { get; set; }
     public int ContentLeftPadding { get; set; }
     public int IconTextGap { get; set; } = 12;
+    public Color AccentColor { get; set; } = Color.Empty;
+    public int AccentWidth { get; set; }
     private bool _hover;
 
     public RoundedButton()
@@ -364,6 +366,14 @@ public sealed class RoundedButton : Button
         using var pen = new Pen(BorderColor, 1f);
         graphics.FillPath(fill, path);
         graphics.DrawPath(pen, path);
+        if (!AccentColor.IsEmpty && AccentWidth > 0)
+        {
+            var accentBounds = new Rectangle(rect.Left + 8, rect.Top + 14, AccentWidth, Math.Max(0, rect.Height - 28));
+            using var accentPath = RoundedPanel.RoundedRect(accentBounds, Math.Max(1, AccentWidth / 2));
+            using var accentBrush = new SolidBrush(AccentColor);
+            graphics.FillPath(accentBrush, accentPath);
+        }
+
         if (string.IsNullOrEmpty(IconText))
         {
             TextRenderer.DrawText(

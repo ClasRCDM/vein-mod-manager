@@ -872,6 +872,8 @@ public sealed partial class MainForm : Form
             button.FillColor = selected ? (scriptsButton ? Color.FromArgb(63, 42, 128) : Purple) : InnerBack;
             button.HoverColor = selected ? (scriptsButton ? Color.FromArgb(82, 55, 166) : PurpleLight) : Color.FromArgb(18, 31, 50);
             button.BorderColor = selected ? (scriptsButton ? Color.FromArgb(126, 88, 255) : PurpleLight) : BorderSoft;
+            button.AccentWidth = selected ? 4 : 0;
+            button.AccentColor = scriptsButton ? Color.FromArgb(196, 181, 253) : PurpleLight;
             button.Invalidate();
         }
 
