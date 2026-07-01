@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 
@@ -341,8 +342,17 @@ public static class RestartSafetyService
             return;
         }
 
-        process.Kill(entireProcessTree: true);
-        process.WaitForExit(5000);
+        try
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(5000);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (Win32Exception)
+        {
+        }
     }
 
     private static bool HasProcessExited(Process process)

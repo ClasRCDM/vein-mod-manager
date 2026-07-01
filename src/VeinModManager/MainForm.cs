@@ -2174,6 +2174,8 @@ public sealed partial class MainForm : Form
         _backupBeforeSaveToggle = AddToggleRow(section, "Backup before save", 190, 46, isChecked: true);
         _backupBeforeUploadToggle = AddToggleRow(section, "Backup before upload", 190, 86, isChecked: true);
         _backupBeforeRestartToggle = AddToggleRow(section, "Verified save backup", 190, 126, isChecked: true);
+        _backupBeforeRestartToggle.Enabled = false;
+        AddTip(_backupBeforeRestartToggle, "Verified save backups are always refreshed after a verified safe stop and skipped only during corruption rollback.");
         _recentBackupsList = new ListBox
         {
             Left = 22,
@@ -2975,7 +2977,7 @@ public sealed partial class MainForm : Form
             LogServer("Started Windows VEIN server.");
             if (monitorCorruption)
             {
-                BeginStartupCorruptionWatch(process, settings, logOffset, attempt: 0);
+                BeginStartupCorruptionWatch(settings, logOffset);
             }
         }
         catch (Exception ex)
@@ -3233,12 +3235,12 @@ public sealed partial class MainForm : Form
             }
 
             var process = _windowsServerProcess!;
-            var createBackup = !skipBackup && _backupBeforeRestartToggle.Checked && Directory.Exists(settings.SaveDirectory);
+            var createBackup = !skipBackup && Directory.Exists(settings.SaveDirectory);
             SetServerStatus("Stopping", Orange);
             LogServer(skipBackup ? "Stopping Windows VEIN server without backup for rollback." : "Stopping Windows VEIN server safely.");
             if (!createBackup && !skipBackup)
             {
-                LogServer("Verified save backup skipped because the save directory was not found or the toggle is off.", Orange);
+                LogServer("Verified save backup skipped because the save directory was not found.", Orange);
             }
 
             _ = Task.Run(() =>
@@ -3300,7 +3302,7 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void BeginStartupCorruptionWatch(Process process, RestartSafetySettings settings, long logOffset, int attempt)
+    private void BeginStartupCorruptionWatch(RestartSafetySettings settings, long logOffset)
     {
         LogServer(string.Create(CultureInfo.InvariantCulture, $"Watching startup log for {settings.StartupWatchSeconds}s; threshold {settings.CorruptionThreshold}."));
         _ = Task.Run(() => RestartSafetyService.WatchStartupForCorruption(settings, logOffset))
@@ -3315,12 +3317,12 @@ public sealed partial class MainForm : Form
                         return;
                     }
 
-                    CompleteStartupCorruptionWatch(process, settings, task.Result, attempt);
+                    CompleteStartupCorruptionWatch(settings, task.Result);
                 });
             });
     }
 
-    private void CompleteStartupCorruptionWatch(Process process, RestartSafetySettings settings, StartupCorruptionCheckResult result, int attempt)
+    private void CompleteStartupCorruptionWatch(RestartSafetySettings settings, StartupCorruptionCheckResult result)
     {
         if (!result.IsCorrupt)
         {
