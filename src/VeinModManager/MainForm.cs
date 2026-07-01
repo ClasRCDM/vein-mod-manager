@@ -25,11 +25,11 @@ public sealed partial class MainForm : Form
     private static readonly Color Amber = Color.FromArgb(240, 167, 60);
     private static readonly Color Red = Color.FromArgb(255, 87, 87);
     private static readonly Color Cyan = Color.FromArgb(18, 223, 213);
-    private const int SidebarLeft = 18;
-    private const int SidebarTop = 52;
-    private const int SidebarWidth = 174;
-    private const int ContentLeft = 207;
-    private const int ContentRightPadding = 31;
+    private const int SidebarLeft = 20;
+    private const int SidebarTop = 54;
+    private const int SidebarWidth = 220;
+    private const int ContentLeft = 296;
+    private const int ContentRightPadding = 44;
     private const int ContentTop = 154;
     private const int ScriptsContentTop = 70;
     private const int ServerContentTop = 262;
@@ -68,7 +68,7 @@ public sealed partial class MainForm : Form
     private RoundedPanel _sidebarFooter = null!;
     private readonly Dictionary<string, Control> _tabPages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RoundedButton> _tabButtons = new(StringComparer.Ordinal);
-    private string _activeTab = "Mods";
+    private string _activeTab = "Scripts";
     private readonly Dictionary<string, Control> _setupSubPages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RoundedButton> _setupSubButtons = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Control> _modsSubPages = new(StringComparer.Ordinal);
@@ -287,10 +287,10 @@ public sealed partial class MainForm : Form
 
         if (_sidebarFooter != null && _sidebar != null)
         {
-            _sidebarFooter.Height = 86;
-            _sidebarFooter.Left = 12;
-            _sidebarFooter.Top = Math.Max(0, _sidebar.Height - _sidebarFooter.Height - 18);
-            _sidebarFooter.Width = Math.Max(0, _sidebar.Width - 24);
+            _sidebarFooter.Height = 120;
+            _sidebarFooter.Left = 2;
+            _sidebarFooter.Top = Math.Max(0, _sidebar.Height - _sidebarFooter.Height - 20);
+            _sidebarFooter.Width = Math.Max(0, _sidebar.Width - 4);
         }
 
         if (_settingsButton != null)
@@ -306,7 +306,7 @@ public sealed partial class MainForm : Form
         if (_contentShell != null)
         {
             var serverSelected = _activeTab.Equals("Server Manager", StringComparison.Ordinal);
-            var fullPageSelected = _activeTab.Equals("Mods", StringComparison.Ordinal);
+            var fullPageSelected = _activeTab.Equals("Mods", StringComparison.Ordinal) || _activeTab.Equals("Scripts", StringComparison.Ordinal);
             _contentShell.Left = ContentLeft;
             _contentShell.Top = fullPageSelected ? ScriptsContentTop : serverSelected ? ServerContentTop : ContentTop;
             _contentShell.Width = Math.Max(720, ClientSize.Width - ContentLeft - ContentRightPadding);
@@ -332,6 +332,14 @@ public sealed partial class MainForm : Form
                 subPage.Width = Math.Max(760, modsPage.Width);
                 subPage.Height = Math.Max(420, modsPage.Height - subPage.Top);
             }
+        }
+
+        if (_contentShell != null && _tabPages.TryGetValue("Scripts", out var scriptsPage))
+        {
+            scriptsPage.Left = 0;
+            scriptsPage.Top = 0;
+            scriptsPage.Width = _contentShell.Width;
+            scriptsPage.Height = _contentShell.Height;
         }
 
     }
@@ -410,26 +418,26 @@ public sealed partial class MainForm : Form
         graphics.Clear(AppBack);
 
         DrawPreviewPanel(graphics, new Rectangle(SidebarLeft, SidebarTop, SidebarWidth, 900), 18, SidebarBack, BorderSoft);
-        DrawPreviewLogo(graphics, new Rectangle(36, 86, 128, 104));
-        DrawPreviewLine(graphics, 36, 232, SidebarWidth - 36);
-        DrawPreviewTab(graphics, "Dashboard", 30, 257, SidebarWidth - 24, selected: false);
-        DrawPreviewTab(graphics, "Setup", 30, 311, SidebarWidth - 24, selected: false);
-        DrawPreviewTab(graphics, "Server Manager", 30, 365, SidebarWidth - 24, selected: false);
-        DrawPreviewTab(graphics, "Mods", 30, 419, SidebarWidth - 24, selected: true);
-        DrawPreviewTab(graphics, "Log", 30, 473, SidebarWidth - 24, selected: false);
-        DrawPreviewPanel(graphics, new Rectangle(30, 890, SidebarWidth - 24, 86), 8, InnerBack, BorderSoft);
-        DrawPreviewText(graphics, "v1.0.0", 46, 902, 9.5F, FontStyle.Bold, TextMuted, width: 120);
-        DrawPreviewText(graphics, "\u00A9 2026 Your Studio", 46, 926, 8.5F, FontStyle.Regular, TextDim, width: 130);
-        DrawPreviewText(graphics, "System Online", 46, 950, 8.5F, FontStyle.Bold, Green, width: 110);
+        DrawPreviewLogo(graphics, new Rectangle(48, 112, 164, 150));
+        DrawPreviewLine(graphics, 40, 298, SidebarWidth - 44);
+        DrawPreviewTab(graphics, "Dashboard", 36, 256, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Setup", 36, 326, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Server Manager", 36, 396, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Mods", 36, 466, SidebarWidth - 36, selected: false);
+        DrawPreviewTab(graphics, "Scripts", 36, 536, SidebarWidth - 36, selected: true);
+        DrawPreviewTab(graphics, "Log", 36, 606, SidebarWidth - 36, selected: false);
+        DrawPreviewPanel(graphics, new Rectangle(34, 868, SidebarWidth - 32, 120), 8, InnerBack, BorderSoft);
+        DrawPreviewText(graphics, "Vein Mod Manager", 50, 886, 9.5F, FontStyle.Regular, TextMuted, width: 150);
+        DrawPreviewText(graphics, "v1.0.0", 50, 912, 8.5F, FontStyle.Regular, TextDim, width: 150);
+        DrawPreviewText(graphics, "System Online", 50, 944, 8.5F, FontStyle.Bold, Green, width: 150);
 
-        DrawPreviewText(graphics, "Mods", ContentLeft, 82, 23, FontStyle.Bold, TextMain);
-        DrawPreviewText(graphics, "Active mods loaded on your server. Enable, disable or remove them.", ContentLeft + 2, 122, 11.5F, FontStyle.Regular, TextDim);
-        DrawPreviewPanel(graphics, new Rectangle(ContentLeft, 149, 110, 38), 8, Purple, PurpleLight);
-        DrawPreviewText(graphics, "Installed Mods", ContentLeft + 10, 158, 9.5F, FontStyle.Bold, TextMain, width: 100);
-        DrawPreviewPanel(graphics, new Rectangle(ContentLeft, 239, 764, 466), 12, Color.FromArgb(10, 16, 31), Color.FromArgb(18, 28, 47));
-        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 782, 239, 520, 466), 12, Color.FromArgb(10, 16, 31), Color.FromArgb(18, 28, 47));
-        DrawPreviewText(graphics, "MOD", ContentLeft + 64, 258, 8.5F, FontStyle.Bold, TextDim, width: 180);
-        DrawPreviewText(graphics, "Quick Stack", ContentLeft + 878, 306, 13F, FontStyle.Bold, TextMain, width: 180);
+        DrawPreviewText(graphics, "Scripts", ContentLeft, 96, 26, FontStyle.Bold, TextMain);
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 148, 106, 142, 30), 15, Color.FromArgb(35, 24, 72), Color.FromArgb(88, 68, 180));
+        DrawPreviewText(graphics, "EXPERIMENTAL", ContentLeft + 164, 113, 9F, FontStyle.Bold, Color.FromArgb(167, 139, 250), width: 112);
+        DrawPreviewText(graphics, "Community automation for your server — scheduled tasks, webhooks and custom hooks.", ContentLeft + 2, 152, 12.5F, FontStyle.Regular, TextDim);
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft, 198, 1213, 66), 10, Color.FromArgb(8, 13, 27), BorderSoft);
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 18, 290, 574, 255), 12, Color.FromArgb(11, 18, 34), Color.FromArgb(22, 31, 52));
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 626, 290, 574, 255), 12, Color.FromArgb(11, 18, 34), Color.FromArgb(22, 31, 52));
     }
 
     private static void DrawPreviewLogo(Graphics graphics, Rectangle bounds)
@@ -586,7 +594,7 @@ public sealed partial class MainForm : Form
             Left = 0,
             Top = 0,
             Width = ClientSize.Width,
-            Height = 36,
+            Height = 52,
             BackColor = Color.FromArgb(19, 21, 29)
         };
         _titleBar.MouseDown += TitleBarMouseDown;
@@ -596,10 +604,10 @@ public sealed partial class MainForm : Form
         {
             var icon = new PictureBox
             {
-                Left = 12,
-                Top = 9,
-                Width = 18,
-                Height = 18,
+                Left = 22,
+                Top = 18,
+                Width = 20,
+                Height = 20,
                 Image = iconImage,
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = _titleBar.BackColor
@@ -608,7 +616,7 @@ public sealed partial class MainForm : Form
             _titleBar.Controls.Add(icon);
         }
 
-        var title = MakeLabel("Vein Mod Manager", 40, 5, 220, 26, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, _titleBar.BackColor);
+        var title = MakeLabel("Vein Mod Manager", 56, 14, 220, 28, 10F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, _titleBar.BackColor);
         title.MouseDown += TitleBarMouseDown;
         _titleBar.Controls.Add(title);
 
@@ -622,7 +630,7 @@ public sealed partial class MainForm : Form
         _titleBar.Controls.Add(new Panel
         {
             Left = 0,
-            Top = 35,
+            Top = 51,
             Width = ClientSize.Width,
             Height = 1,
             BackColor = Color.FromArgb(28, 32, 48),
@@ -637,7 +645,7 @@ public sealed partial class MainForm : Form
             Text = text,
             Top = 0,
             Width = 48,
-            Height = 36,
+            Height = 52,
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(19, 21, 29),
             ForeColor = TextDim,
@@ -677,36 +685,28 @@ public sealed partial class MainForm : Form
         _sidebar.BorderColor = BorderSoft;
         Controls.Add(_sidebar);
 
-        var logoCard = NewPanel(0, 18, 34, 128, 104);
-        logoCard.FillColor = Color.Black;
-        logoCard.BorderColor = Color.Black;
-        logoCard.BackColor = SidebarBack;
-        if (LoadLogoImage() is { } logoImage)
+        var logo = new VeinLogoPanel
         {
-            var logoPicture = new PictureBox
-            {
-                Left = 0,
-                Top = 0,
-                Width = 128,
-                Height = 76,
-                Image = logoImage,
-                SizeMode = PictureBoxSizeMode.StretchImage,
-                BackColor = Color.Black
-            };
-            logoCard.Controls.Add(logoPicture);
-        }
-        logoCard.Controls.Add(MakeLabel("MOD MANAGER", 0, 76, 128, 28, 9F, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, Color.Black));
-        _sidebar.Controls.Add(logoCard);
-        _sidebar.Controls.Add(Line(18, 180, SidebarWidth - 36));
+            Left = 28,
+            Top = 58,
+            Width = 164,
+            Height = 136,
+            BackColor = SidebarBack,
+            GlowColor = Color.FromArgb(185, 24, 38),
+            AccentColor = Color.FromArgb(185, 24, 38),
+            MainColor = Color.White
+        };
+        _sidebar.Controls.Add(logo);
+        _sidebar.Controls.Add(Line(20, 200, SidebarWidth - 40));
 
-        _sidebarFooter = NewPanel(8, 12, 814, SidebarWidth - 24, 86);
+        _sidebarFooter = NewPanel(8, 2, 814, SidebarWidth - 4, 120);
         _sidebarFooter.FillColor = InnerBack;
         _sidebarFooter.BorderColor = BorderSoft;
         _sidebarFooter.BackColor = SidebarBack;
-        _sidebarFooter.Controls.Add(MakeLabel("v1.0.0", 16, 12, _sidebarFooter.Width - 32, 20, 9.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, InnerBack));
-        _sidebarFooter.Controls.Add(MakeLabel("\u00A9 2026 Your Studio", 16, 36, _sidebarFooter.Width - 32, 20, 8.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, InnerBack));
-        _sidebarFooter.Controls.Add(MakeLabel("\u2022 System Online", 16, 60, 110, 20, 8.8F, FontStyle.Regular, Green, ContentAlignment.MiddleLeft, InnerBack));
-        var footerSettings = MakeButton("\uE713", _sidebarFooter.Width - 42, 54, 30, 30, () => ShowTab("Settings"));
+        _sidebarFooter.Controls.Add(MakeLabel("Vein Mod Manager", 18, 18, _sidebarFooter.Width - 36, 22, 9.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, InnerBack));
+        _sidebarFooter.Controls.Add(MakeLabel("v1.0.0", 18, 44, _sidebarFooter.Width - 36, 22, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, InnerBack));
+        _sidebarFooter.Controls.Add(MakeLabel("\u2022 System Online", 18, 76, 130, 24, 10F, FontStyle.Regular, Green, ContentAlignment.MiddleLeft, InnerBack));
+        var footerSettings = MakeButton("\uE713", _sidebarFooter.Width - 42, 76, 30, 30, () => ShowTab("Settings"));
         footerSettings.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
         footerSettings.FillColor = Color.FromArgb(16, 20, 30);
         footerSettings.HoverColor = Color.FromArgb(26, 31, 44);
@@ -829,16 +829,17 @@ public sealed partial class MainForm : Form
         _tabPages["Settings"] = BuildSettingsTab();
         _tabPages["Server Manager"] = BuildServerManagerTab();
         _tabPages["Mods"] = BuildModsTab();
+        _tabPages["Scripts"] = BuildScriptsTab();
         _tabPages["Log"] = BuildLogTab();
 
-        var y = 205;
-        foreach (var title in new[] { "Dashboard", "Setup", "Server Manager", "Mods", "Log" })
+        var y = 202;
+        foreach (var title in new[] { "Dashboard", "Setup", "Server Manager", "Mods", "Scripts", "Log" })
         {
             var button = NewSidebarTabButton(title, 14, y);
             button.Click += (_, _) => ShowTab(title);
             _tabButtons[title] = button;
             _sidebar.Controls.Add(button);
-            y += 54;
+            y += 70;
         }
 
         foreach (var page in _tabPages.Values)
@@ -848,7 +849,7 @@ public sealed partial class MainForm : Form
         }
 
         Controls.Add(shell);
-        ShowTab("Mods");
+        ShowTab("Scripts");
     }
 
 
@@ -869,9 +870,10 @@ public sealed partial class MainForm : Form
         foreach (var (name, button) in _tabButtons)
         {
             var selected = name.Equals(title, StringComparison.Ordinal);
-            button.FillColor = selected ? Purple : InnerBack;
-            button.HoverColor = selected ? PurpleLight : Color.FromArgb(18, 31, 50);
-            button.BorderColor = selected ? PurpleLight : BorderSoft;
+            var scriptsButton = name.Equals("Scripts", StringComparison.Ordinal);
+            button.FillColor = selected ? (scriptsButton ? Color.FromArgb(63, 42, 128) : Purple) : InnerBack;
+            button.HoverColor = selected ? (scriptsButton ? Color.FromArgb(82, 55, 166) : PurpleLight) : Color.FromArgb(18, 31, 50);
+            button.BorderColor = selected ? (scriptsButton ? Color.FromArgb(126, 88, 255) : PurpleLight) : BorderSoft;
             button.Invalidate();
         }
 
@@ -887,7 +889,8 @@ public sealed partial class MainForm : Form
         var dashboardSelected = title.Equals("Dashboard", StringComparison.Ordinal);
         var setupSelected = title.Equals("Setup", StringComparison.Ordinal);
         var serverSelected = title.Equals("Server Manager", StringComparison.Ordinal);
-        var fullPageSelected = title.Equals("Mods", StringComparison.Ordinal);
+        var scriptsSelected = title.Equals("Scripts", StringComparison.Ordinal);
+        var fullPageSelected = title.Equals("Mods", StringComparison.Ordinal) || scriptsSelected;
         _headerTitle.Visible = !fullPageSelected;
         _headerSubtitle.Visible = (dashboardSelected || setupSelected) && !fullPageSelected;
         if (_settingsButton != null)
@@ -1000,7 +1003,7 @@ public sealed partial class MainForm : Form
         panel.Controls.Add(subtitle);
 
         var x = 0;
-        foreach (var (title, width) in new[] { ("Installed Mods", 112), ("Nexus Search", 112), ("Scripts", 80) })
+        foreach (var (title, width) in new[] { ("Installed Mods", 112), ("Nexus Search", 112) })
         {
             var button = NewTabButton(title, x, 78, width);
             button.Height = 38;
@@ -1014,7 +1017,6 @@ public sealed partial class MainForm : Form
 
         _modsSubPages["Installed Mods"] = BuildInstalledModsPane();
         _modsSubPages["Nexus Search"] = BuildNexusSearchPane();
-        _modsSubPages["Scripts"] = BuildScriptsTab();
 
         foreach (var page in _modsSubPages.Values)
         {
@@ -1283,6 +1285,11 @@ public sealed partial class MainForm : Form
         panel.FillColor = AppBack;
 
         panel.Controls.Add(MakeLabel("Scripts", 0, 24, 150, 48, 26F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
+        var experimental = NewPill("EXPERIMENTAL", 148, 34, 142, 30, Color.FromArgb(35, 24, 72));
+        experimental.BackColor = AppBack;
+        experimental.BorderColor = Color.FromArgb(88, 68, 180);
+        experimental.Radius = 15;
+        panel.Controls.Add(experimental);
         panel.Controls.Add(MakeLabel("Community automation for your server \u2014 scheduled tasks, webhooks and custom hooks.", 0, 82, 820, 30, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
 
         var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
@@ -4773,20 +4780,20 @@ public sealed partial class MainForm : Form
         return new RoundedButton
         {
             Text = text,
-            Left = x,
+            Left = 2,
             Top = y,
-            Width = SidebarWidth - 24,
-            Height = 44,
+            Width = SidebarWidth - 4,
+            Height = 60,
             Radius = 8,
             FillColor = InnerBack,
             HoverColor = Color.FromArgb(15, 25, 43),
             BorderColor = BorderSoft,
             ForeColor = TextMain,
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             IconText = SidebarIconFor(text),
-            IconFont = new Font("Segoe MDL2 Assets", 10F, FontStyle.Regular),
-            ContentLeftPadding = 10,
-            IconTextGap = 4,
+            IconFont = text.Equals("Scripts", StringComparison.Ordinal) ? new Font("Segoe UI", 11F, FontStyle.Bold) : new Font("Segoe MDL2 Assets", 12F, FontStyle.Regular),
+            ContentLeftPadding = 24,
+            IconTextGap = 14,
             FlatStyle = FlatStyle.Flat
         };
     }
@@ -4797,6 +4804,7 @@ public sealed partial class MainForm : Form
         "Setup" => "\uE90F",
         "Server Manager" => "\uE968",
         "Mods" => "\uE713",
+        "Scripts" => "</>",
         "Log" => "\uE8FD",
         _ => string.Empty
     };
