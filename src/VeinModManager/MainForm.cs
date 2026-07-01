@@ -1497,14 +1497,44 @@ public sealed partial class MainForm : Form
         underline.Cursor = Cursors.Hand;
         underline.Click += (_, _) => action();
         parent.Controls.Add(underline);
+        void SetFilterHover(bool hover)
+        {
+            var active = underline.Visible;
+            var color = active ? TextMain : hover ? TextMuted : TextDim;
+            label.ForeColor = color;
+            if (iconControl is ScriptIconPanel scriptIcon)
+            {
+                scriptIcon.IconColor = color;
+                scriptIcon.Invalidate();
+            }
+            else if (iconControl is Label iconLabel)
+            {
+                iconLabel.ForeColor = color;
+            }
+        }
+
+        void WireFilterHover(Control control)
+        {
+            control.MouseEnter += (_, _) => SetFilterHover(true);
+            control.MouseLeave += (_, _) => SetFilterHover(false);
+        }
+
+        WireFilterHover(label);
+        WireFilterHover(underline);
+        if (iconControl != null)
+        {
+            WireFilterHover(iconControl);
+        }
         return (iconControl, label, underline);
     }
 
     private RoundedPanel BuildScriptCard(string title, string subtitle, string description, string status, ScriptIconKind iconKind, bool enabled, int x, int y, int w, int h)
     {
+        var normalBorder = Color.FromArgb(22, 31, 52);
+        var hoverBorder = Color.FromArgb(65, 74, 116);
         var card = NewPanel(12, x, y, w, h);
         card.FillColor = Color.FromArgb(11, 18, 34);
-        card.BorderColor = Color.FromArgb(22, 31, 52);
+        card.BorderColor = normalBorder;
 
         var iconBox = NewPanel(8, 28, 28, 64, 64);
         iconBox.FillColor = Color.FromArgb(16, 23, 43);
@@ -1551,6 +1581,32 @@ public sealed partial class MainForm : Form
         iconBox.Click += (_, _) => OpenEditor();
         iconPanel.Click += (_, _) => OpenEditor();
         toggle.CheckedChanged += (_, _) => ShowScriptToggleDialog(title, toggle.Checked);
+        void SetCardHover(bool hover)
+        {
+            card.BorderColor = hover ? hoverBorder : normalBorder;
+            iconBox.BorderColor = hover ? Color.FromArgb(58, 66, 112) : Color.FromArgb(31, 38, 70);
+            card.Invalidate();
+            iconBox.Invalidate();
+        }
+
+        void CardMouseLeave(object? sender, EventArgs e)
+        {
+            if (!card.ClientRectangle.Contains(card.PointToClient(Cursor.Position)))
+            {
+                SetCardHover(false);
+            }
+        }
+
+        void WireCardHover(Control control)
+        {
+            control.MouseEnter += (_, _) => SetCardHover(true);
+            control.MouseLeave += CardMouseLeave;
+        }
+
+        foreach (var control in new Control[] { card, iconBox, iconPanel, titleLabel, subtitleLabel, descriptionLabel, statusDot, statusLabel, editLabel, runLabel })
+        {
+            WireCardHover(control);
+        }
 
         card.Controls.Add(iconBox);
         card.Controls.Add(titleLabel);
@@ -1587,6 +1643,10 @@ public sealed partial class MainForm : Form
 
     private RoundedPanel BuildCustomScriptDropZone(int x, int y, int w, int h)
     {
+        var normalZoneBorder = Color.FromArgb(91, 68, 175);
+        var hoverZoneBorder = Color.FromArgb(147, 82, 255);
+        var normalPlusBorder = Color.FromArgb(75, 55, 150);
+        var hoverPlusBorder = Color.FromArgb(147, 82, 255);
         var zone = new DashedRoundedPanel
         {
             Left = x,
@@ -1595,12 +1655,12 @@ public sealed partial class MainForm : Form
             Height = h,
             Radius = 12,
             FillColor = AppBack,
-            BorderColor = Color.FromArgb(91, 68, 175),
+            BorderColor = normalZoneBorder,
             BackColor = AppBack
         };
         var plus = NewPanel(8, 0, 52, 54, 54);
         plus.FillColor = Color.FromArgb(9, 14, 28);
-        plus.BorderColor = Color.FromArgb(75, 55, 150);
+        plus.BorderColor = normalPlusBorder;
         plus.BackColor = zone.FillColor;
         var plusLabel = MakeLabel("+", 0, 0, 54, 54, 21, FontStyle.Regular, Color.FromArgb(147, 82, 255), ContentAlignment.MiddleCenter, plus.FillColor);
         plus.Controls.Add(plusLabel);
@@ -1621,6 +1681,35 @@ public sealed partial class MainForm : Form
         plusLabel.Click += (_, _) => OpenNewScript();
         titleLabel.Click += (_, _) => OpenNewScript();
         subtitleLabel.Click += (_, _) => OpenNewScript();
+
+        void SetZoneHover(bool hover)
+        {
+            zone.BorderColor = hover ? hoverZoneBorder : normalZoneBorder;
+            plus.BorderColor = hover ? hoverPlusBorder : normalPlusBorder;
+            plusLabel.ForeColor = hover ? Color.FromArgb(196, 181, 253) : Color.FromArgb(147, 82, 255);
+            titleLabel.ForeColor = hover ? TextMain : TextMuted;
+            zone.Invalidate();
+            plus.Invalidate();
+        }
+
+        void ZoneMouseLeave(object? sender, EventArgs e)
+        {
+            if (!zone.ClientRectangle.Contains(zone.PointToClient(Cursor.Position)))
+            {
+                SetZoneHover(false);
+            }
+        }
+
+        void WireZoneHover(Control control)
+        {
+            control.MouseEnter += (_, _) => SetZoneHover(true);
+            control.MouseLeave += ZoneMouseLeave;
+        }
+
+        foreach (var control in new Control[] { zone, plus, plusLabel, titleLabel, subtitleLabel })
+        {
+            WireZoneHover(control);
+        }
 
         void LayoutDropZone()
         {
@@ -4462,6 +4551,8 @@ public sealed partial class MainForm : Form
         };
         popup.Shown += (_, _) => UseDarkTitleBar(popup.Handle);
         shell = NewPanel(14, 18, 18, width - 36, height - 36);
+        shell.FillColor = Color.FromArgb(9, 15, 30);
+        shell.BorderColor = Color.FromArgb(39, 48, 86);
         shell.BackColor = AppBack;
         popup.Controls.Add(shell);
         return popup;
@@ -4511,9 +4602,13 @@ public sealed partial class MainForm : Form
 
     private static Label MakeActionLabel(string text, int x, int y, int w, int h, Color color, Action action)
     {
+        var normalColor = color;
+        var hoverColor = color == TextMuted ? TextMain : Color.FromArgb(196, 181, 253);
         var label = MakeLabel(text, x, y, w, h, 10F, FontStyle.Bold, color, ContentAlignment.MiddleLeft, Color.Transparent);
         label.Cursor = Cursors.Hand;
         label.Click += (_, _) => action();
+        label.MouseEnter += (_, _) => label.ForeColor = hoverColor;
+        label.MouseLeave += (_, _) => label.ForeColor = normalColor;
         return label;
     }
 
