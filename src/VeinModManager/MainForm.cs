@@ -633,6 +633,18 @@ public sealed partial class MainForm : Form
         Log("Tooltips " + (enabled ? "enabled." : "disabled."));
     }
 
+    private static void SetRedraw(Control? control, bool enabled)
+    {
+        if (control == null || control.IsDisposed || !control.IsHandleCreated) return;
+
+        SendMessage(control.Handle, 0x000B, enabled ? new IntPtr(1) : IntPtr.Zero, IntPtr.Zero);
+        if (!enabled) return;
+
+        control.Invalidate(true);
+        control.Update();
+    }
+
+
     private void BuildTitleBar()
     {
         _titleBar = new Panel
@@ -906,71 +918,97 @@ public sealed partial class MainForm : Form
 
     private void ShowTab(string title)
     {
-        _activeTab = title;
+        if (!_tabPages.TryGetValue(title, out var selectedPage)) return;
+        if (_activeTab.Equals(title, StringComparison.Ordinal) && selectedPage.Visible) return;
 
-        foreach (var (name, page) in _tabPages)
+        SetRedraw(this, false);
+        SuspendLayout();
+        _contentShell?.SuspendLayout();
+        _sidebar?.SuspendLayout();
+
+        try
         {
-            var selected = name.Equals(title, StringComparison.Ordinal);
-            page.Visible = selected;
-            if (selected)
+            _activeTab = title;
+
+            foreach (var (name, page) in _tabPages)
             {
-                page.BringToFront();
+                var selected = name.Equals(title, StringComparison.Ordinal);
+                if (page.Visible != selected)
+                {
+                    page.Visible = selected;
+                }
+
+                if (selected)
+                {
+                    page.BringToFront();
+                }
+            }
+
+            foreach (var (name, button) in _tabButtons)
+            {
+                var selected = name.Equals(title, StringComparison.Ordinal);
+                var scriptsButton = name.Equals("Scripts", StringComparison.Ordinal);
+                button.FillColor = selected ? (scriptsButton ? Color.FromArgb(42, 31, 86) : Color.FromArgb(78, 18, 32)) : Color.Transparent;
+                button.HoverColor = selected ? (scriptsButton ? Color.FromArgb(55, 42, 112) : Color.FromArgb(106, 24, 40)) : Color.FromArgb(18, 28, 47);
+                button.BorderColor = selected ? (scriptsButton ? BrandPurpleLight : BrandRedHot) : Color.Transparent;
+                button.FocusBorderColor = scriptsButton ? BrandPurpleLight : BrandRedHot;
+                button.AccentWidth = selected ? 4 : 0;
+                button.AccentColor = scriptsButton ? BrandPurpleLight : BrandRedHot;
+                button.Invalidate();
+            }
+
+            if (_settingsButton != null)
+            {
+                var settingsSelected = title.Equals("Settings", StringComparison.Ordinal);
+                _settingsButton.FillColor = settingsSelected ? Color.FromArgb(78, 18, 32) : InnerBack;
+                _settingsButton.HoverColor = settingsSelected ? Color.FromArgb(106, 24, 40) : Color.FromArgb(18, 31, 50);
+                _settingsButton.BorderColor = settingsSelected ? BrandRedHot : BorderSoft;
+                _settingsButton.Invalidate();
+            }
+
+            var dashboardSelected = title.Equals("Dashboard", StringComparison.Ordinal);
+            var setupSelected = title.Equals("Setup", StringComparison.Ordinal);
+            var serverSelected = title.Equals("Server Manager", StringComparison.Ordinal);
+            var scriptsSelected = title.Equals("Scripts", StringComparison.Ordinal);
+            var fullPageSelected = title.Equals("Mods", StringComparison.Ordinal) || scriptsSelected;
+            _headerTitle.Visible = !fullPageSelected;
+            _headerSubtitle.Visible = (dashboardSelected || setupSelected) && !fullPageSelected;
+            if (_settingsButton != null)
+            {
+                _settingsButton.Visible = !fullPageSelected;
+            }
+
+            foreach (var control in _overviewControls)
+            {
+                control.Visible = false;
+            }
+
+            foreach (var control in _serverOverviewControls)
+            {
+                control.Visible = serverSelected;
+            }
+
+            if (_contentShell != null)
+            {
+                _contentShell.Top = fullPageSelected
+                    ? ScriptsContentTop
+                    : serverSelected ? ServerContentTop : ContentTop;
+                _contentShell.Height = Math.Max(420, ClientSize.Height - _contentShell.Top - 40);
+            }
+
+            ApplyResponsiveLayout();
+            if (dashboardSelected)
+            {
+                RefreshDashboard();
             }
         }
-
-        foreach (var (name, button) in _tabButtons)
+        finally
         {
-            var selected = name.Equals(title, StringComparison.Ordinal);
-            var scriptsButton = name.Equals("Scripts", StringComparison.Ordinal);
-            button.FillColor = selected ? (scriptsButton ? Color.FromArgb(42, 31, 86) : Color.FromArgb(78, 18, 32)) : Color.Transparent;
-            button.HoverColor = selected ? (scriptsButton ? Color.FromArgb(55, 42, 112) : Color.FromArgb(106, 24, 40)) : Color.FromArgb(18, 28, 47);
-            button.BorderColor = selected ? (scriptsButton ? BrandPurpleLight : BrandRedHot) : Color.Transparent;
-            button.FocusBorderColor = scriptsButton ? BrandPurpleLight : BrandRedHot;
-            button.AccentWidth = selected ? 4 : 0;
-            button.AccentColor = scriptsButton ? BrandPurpleLight : BrandRedHot;
-            button.Invalidate();
+            _sidebar?.ResumeLayout(false);
+            _contentShell?.ResumeLayout(false);
+            ResumeLayout(false);
+            SetRedraw(this, true);
         }
-
-        if (_settingsButton != null)
-        {
-            var settingsSelected = title.Equals("Settings", StringComparison.Ordinal);
-            _settingsButton.FillColor = settingsSelected ? Color.FromArgb(78, 18, 32) : InnerBack;
-            _settingsButton.HoverColor = settingsSelected ? Color.FromArgb(106, 24, 40) : Color.FromArgb(18, 31, 50);
-            _settingsButton.BorderColor = settingsSelected ? BrandRedHot : BorderSoft;
-            _settingsButton.Invalidate();
-        }
-
-        var dashboardSelected = title.Equals("Dashboard", StringComparison.Ordinal);
-        var setupSelected = title.Equals("Setup", StringComparison.Ordinal);
-        var serverSelected = title.Equals("Server Manager", StringComparison.Ordinal);
-        var scriptsSelected = title.Equals("Scripts", StringComparison.Ordinal);
-        var fullPageSelected = title.Equals("Mods", StringComparison.Ordinal) || scriptsSelected;
-        _headerTitle.Visible = !fullPageSelected;
-        _headerSubtitle.Visible = (dashboardSelected || setupSelected) && !fullPageSelected;
-        if (_settingsButton != null)
-        {
-            _settingsButton.Visible = !fullPageSelected;
-        }
-        foreach (var control in _overviewControls)
-        {
-            control.Visible = false;
-        }
-
-        foreach (var control in _serverOverviewControls)
-        {
-            control.Visible = serverSelected;
-        }
-
-        if (_contentShell != null)
-        {
-            _contentShell.Top = fullPageSelected
-                ? ScriptsContentTop
-                : serverSelected ? ServerContentTop : ContentTop;
-            _contentShell.Height = Math.Max(420, ClientSize.Height - _contentShell.Top - 40);
-        }
-
-        ApplyResponsiveLayout();
-        RefreshDashboard();
     }
 
     private RoundedPanel BuildDashboardTab()
@@ -1088,23 +1126,42 @@ public sealed partial class MainForm : Form
 
     private void ShowModsSubTab(string title)
     {
-        foreach (var (name, page) in _modsSubPages)
+        if (!_modsSubPages.TryGetValue(title, out var selectedPage)) return;
+        if (selectedPage.Visible) return;
+
+        var host = _tabPages.TryGetValue("Mods", out var modsHost) ? modsHost : selectedPage.Parent;
+        SetRedraw(host, false);
+        host?.SuspendLayout();
+
+        try
         {
-            var selected = name.Equals(title, StringComparison.Ordinal);
-            page.Visible = selected;
-            if (selected)
+            foreach (var (name, page) in _modsSubPages)
             {
-                page.BringToFront();
+                var selected = name.Equals(title, StringComparison.Ordinal);
+                if (page.Visible != selected)
+                {
+                    page.Visible = selected;
+                }
+
+                if (selected)
+                {
+                    page.BringToFront();
+                }
+            }
+
+            foreach (var (name, button) in _modsSubButtons)
+            {
+                var selected = name.Equals(title, StringComparison.Ordinal);
+                button.FillColor = selected ? Purple : InnerBack;
+                button.HoverColor = selected ? PurpleLight : Color.FromArgb(18, 24, 40);
+                button.BorderColor = selected ? PurpleLight : BorderSoft;
+                button.Invalidate();
             }
         }
-
-        foreach (var (name, button) in _modsSubButtons)
+        finally
         {
-            var selected = name.Equals(title, StringComparison.Ordinal);
-            button.FillColor = selected ? Purple : InnerBack;
-            button.HoverColor = selected ? PurpleLight : Color.FromArgb(18, 24, 40);
-            button.BorderColor = selected ? PurpleLight : BorderSoft;
-            button.Invalidate();
+            host?.ResumeLayout(false);
+            SetRedraw(host, true);
         }
     }
 
@@ -2144,24 +2201,48 @@ public sealed partial class MainForm : Form
 
     private void ShowServerSubTab(string title)
     {
-        foreach (var (name, page) in _serverSubPages)
-        {
-            var selected = name.Equals(title, StringComparison.Ordinal);
-            page.Visible = selected;
-            if (selected) page.BringToFront();
-        }
+        if (!_serverSubPages.TryGetValue(title, out var selectedPage)) return;
+        if (selectedPage.Visible) return;
 
-        foreach (var (name, button) in _serverSubButtons)
+        var host = _tabPages.TryGetValue("Server Manager", out var serverHost) ? serverHost : selectedPage.Parent;
+        SetRedraw(host, false);
+        host?.SuspendLayout();
+        _serverTabFlow?.SuspendLayout();
+
+        try
         {
-            var selected = name.Equals(title, StringComparison.Ordinal);
-            button.FillColor = selected ? Color.FromArgb(78, 18, 32) : SurfaceInset;
-            button.HoverColor = selected ? Color.FromArgb(106, 24, 40) : Color.FromArgb(18, 31, 50);
-            button.BorderColor = selected ? BrandRedHot : BorderSoft;
-            button.Invalidate();
+            foreach (var (name, page) in _serverSubPages)
+            {
+                var selected = name.Equals(title, StringComparison.Ordinal);
+                if (page.Visible != selected)
+                {
+                    page.Visible = selected;
+                }
+
+                if (selected)
+                {
+                    page.BringToFront();
+                }
+            }
+
+            foreach (var (name, button) in _serverSubButtons)
+            {
+                var selected = name.Equals(title, StringComparison.Ordinal);
+                button.FillColor = selected ? Color.FromArgb(78, 18, 32) : SurfaceInset;
+                button.HoverColor = selected ? Color.FromArgb(106, 24, 40) : Color.FromArgb(18, 31, 50);
+                button.BorderColor = selected ? BrandRedHot : BorderSoft;
+                button.Invalidate();
+            }
+        }
+        finally
+        {
+            _serverTabFlow?.ResumeLayout(false);
+            host?.ResumeLayout(false);
+            SetRedraw(host, true);
         }
 
         _serverTabFlow?.PerformLayout();
-        _serverTabFlow?.Invalidate(true);
+        _serverTabFlow?.Invalidate();
     }
 
     private Panel BuildServerMainSettingsPage()
