@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VeinModManager/VeinModManager.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VeinModManager.SmokeTests/VeinModManager.SmokeTests.csproj" />
+  </Folder>
+</Solution>

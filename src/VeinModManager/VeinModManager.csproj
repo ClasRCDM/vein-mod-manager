@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>VEIN_Item_And_Container_Modifier</RootNamespace>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Assets\vein-logo.ico</ApplicationIcon>
+    <AssemblyName>Vein Mod Manager</AssemblyName>
+    <AssemblyTitle>Vein Mod Manager</AssemblyTitle>
+    <Product>Vein Mod Manager</Product>
+    <FileDescription>Vein Mod Manager</FileDescription>
+    <Authors>Cyberfox1337</Authors>
+    <RepositoryUrl>https://github.com/cyberfox1337x/vein-mod-manager</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/cyberfox1337x/vein-mod-manager</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="ModTemplate\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <None Include="..\..\README.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

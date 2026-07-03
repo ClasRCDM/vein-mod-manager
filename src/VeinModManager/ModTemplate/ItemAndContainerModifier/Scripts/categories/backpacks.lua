@@ -1,0 +1,42 @@
+return {
+		["BP_BackpackSchool_C"] = {
+			Weight      = nil,
+			MaxStack    = 1,
+			bStackable  = false,
+            ExtraWeightCapacity = nil,
+            RunSpeedMultiplier  = nil,
+            _CDOPath = "/Game/Vein/Items/Clothing/08_Back/BP_BackpackSchool.Default__BP_BackpackSchool_C",
+        },
+		["BP_BackpackHiking_C"] = {
+			Weight      = nil,
+			MaxStack    = 1,
+			bStackable  = false,
+            ExtraWeightCapacity = nil,  
+            RunSpeedMultiplier  = nil,
+            _CDOPath = "/Game/Vein/Items/Clothing/08_Back/BP_BackpackHiking.Default__BP_BackpackHiking_C",
+        },
+		["BP_BackpackMilitary_C"] = {
+			Weight      = nil,
+			MaxStack    = 1,
+			bStackable  = false,
+            ExtraWeightCapacity = nil,  
+            RunSpeedMultiplier  = nil,
+            _CDOPath = "/Game/Vein/Items/Clothing/08_Back/BP_BackpackMilitary.Default__BP_BackpackMilitary_C",
+        },
+		["BP_BackpackGolf_C"] = {
+			Weight      = nil,
+			MaxStack    = 1,
+			bStackable  = false,
+            ExtraWeightCapacity = nil,  
+            RunSpeedMultiplier  = nil,
+            _CDOPath = "/Game/Vein/Items/Clothing/08_Back/BP_BackpackGolf.Default__BP_BackpackGolf_C",
+        },
+		["BP_BackpackGym_C"]  = {
+			Weight      = nil,
+			MaxStack    = 1,
+			bStackable  = false,
+            ExtraWeightCapacity = nil,  
+            RunSpeedMultiplier  = nil,
+            _CDOPath = "/Game/Vein/Items/Clothing/08_Back/BP_BackpackGym.Default__BP_BackpackGym_C",
+        },
+}

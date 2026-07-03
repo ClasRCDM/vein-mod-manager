@@ -1,20 +1,7 @@
-# Security and Privacy
+# Security Policy
 
-Do not upload private dump files, save files, access tokens, passwords, `.env` files, or local logs to public issues.
+Keep the repository limited to source files, documentation, and assets required to build the app.
 
-When reporting a bug, include:
+Do not commit local settings, credentials, diagnostics, build output, or private user data.
 
-- Windows version.
-- VEIN install path if it is not the default Steam path.
-- Whether UE4SS was detected.
-- The visible error message.
-- A short excerpt from logs with private paths or account names removed.
-
-Do not include:
-
-- Steam credentials.
-- Nexus credentials.
-- GitHub tokens.
-- Home server details.
-- Full memory dumps.
-- Private save files.
+Open a GitHub issue for normal bugs. For sensitive reports, contact the maintainer privately before posting details.

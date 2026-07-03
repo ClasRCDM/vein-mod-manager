@@ -1,34 +1,35 @@
-bin/
-obj/
-.vs/
-.vscode/
-*.user
-*.suo
-*.nupkg
-
-# Local secrets and machine-only config
-.env
-*.env
+# Local private files
+*.pem
+*.pfx
+*.key
+*.crt
+*.p12
 secrets/
 
-# Runtime dump output
-Dumps/
-Logs/
-Exports/
-GameFiles/
-VEIN_MasterDump_*/
-VEIN_Dump_Control/
-*.log
-*.jsonl
+# Build output
+bin/
+obj/
+publish/
+artifacts/
+graphify-out/
+TestResults/
 
-# Release artifacts are uploaded to GitHub Releases, not committed.
-dist/
-release/
-outputs/
-*.zip
-*.7z
-*.rar
+# IDE/user state
+.vs/
+.vscode/.ropeproject/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Runtime/mod local output
+Backups/
+UE4SS_logs/
+*.dmp
+*.log
+crash_*.dmp
 
 # OS noise
 Thumbs.db
 Desktop.ini
+.DS_Store
