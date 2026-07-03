@@ -9,6 +9,12 @@ public class RoundedPanel : Panel
     public int Radius { get; set; } = 14;
     public Color FillColor { get; set; } = Color.FromArgb(10, 18, 30);
     public Color BorderColor { get; set; } = Color.FromArgb(32, 53, 82);
+    public Color GradientTopColor { get; set; } = Color.Empty;
+    public Color GradientBottomColor { get; set; } = Color.Empty;
+    public Color HighlightColor { get; set; } = Color.Empty;
+    public Color InnerShadowColor { get; set; } = Color.Empty;
+    public Color GlowColor { get; set; } = Color.Empty;
+    public float BorderThickness { get; set; } = 1f;
 
     public RoundedPanel()
     {
@@ -17,24 +23,84 @@ public class RoundedPanel : Panel
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        e.Graphics.Clear(VisualBackColor(Parent, BackColor));
-        using var path = RoundedRect(new Rectangle(1, 1, Width - 3, Height - 3), Radius);
-        using var fill = new SolidBrush(FillColor);
-        using var pen = new Pen(BorderColor, 1f);
-        e.Graphics.FillPath(fill, path);
-        e.Graphics.DrawPath(pen, path);
+        PaintRoundedSurface(e.Graphics, dashed: false);
+    }
+
+    protected void PaintRoundedSurface(Graphics graphics, bool dashed)
+    {
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        graphics.Clear(VisualBackColor(Parent, BackColor));
+        if (Width <= 2 || Height <= 2) return;
+
+        var rect = new Rectangle(1, 1, Width - 3, Height - 3);
+        using var path = RoundedRect(rect, Radius);
+        using var fill = CreateSurfaceBrush(rect);
+        graphics.FillPath(fill, path);
+
+        if (!GlowColor.IsEmpty)
+        {
+            using var glowPath = new GraphicsPath();
+            glowPath.AddEllipse(rect.Left + rect.Width / 4, rect.Top - rect.Height / 2, Math.Max(1, rect.Width), Math.Max(1, rect.Height));
+            using var glowBrush = new PathGradientBrush(glowPath)
+            {
+                CenterColor = Color.FromArgb(86, GlowColor),
+                SurroundColors = new[] { Color.FromArgb(0, GlowColor) }
+            };
+            var state = graphics.Save();
+            graphics.SetClip(path);
+            graphics.FillPath(glowBrush, glowPath);
+            graphics.Restore(state);
+        }
+
+        if (!InnerShadowColor.IsEmpty)
+        {
+            var state = graphics.Save();
+            graphics.SetClip(path);
+            using var shadow = new Pen(InnerShadowColor, Math.Max(2f, Radius * 0.38f));
+            graphics.DrawPath(shadow, path);
+            graphics.Restore(state);
+        }
+
+        if (!HighlightColor.IsEmpty)
+        {
+            var highlightBounds = Rectangle.Inflate(rect, -Math.Max(2, Radius / 3), -Math.Max(2, Radius / 3));
+            if (highlightBounds.Width > 0 && highlightBounds.Height > 0)
+            {
+                using var highlight = new Pen(HighlightColor, 1f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+                graphics.DrawLine(highlight, highlightBounds.Left, highlightBounds.Top, highlightBounds.Right, highlightBounds.Top);
+            }
+        }
+
+        using var pen = new Pen(BorderColor, BorderThickness);
+        if (dashed)
+        {
+            pen.DashPattern = new[] { 6f, 6f };
+        }
+        graphics.DrawPath(pen, path);
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
     }
 
+    internal Brush CreateSurfaceBrush(Rectangle bounds)
+    {
+        if (!GradientTopColor.IsEmpty || !GradientBottomColor.IsEmpty)
+        {
+            var top = GradientTopColor.IsEmpty ? FillColor : GradientTopColor;
+            var bottom = GradientBottomColor.IsEmpty ? FillColor : GradientBottomColor;
+            return new LinearGradientBrush(bounds, top, bottom, LinearGradientMode.Vertical);
+        }
+
+        return new SolidBrush(FillColor);
+    }
+
     internal static GraphicsPath RoundedRect(Rectangle bounds, int radius)
     {
-        var diameter = Math.Max(1, radius * 2);
         var path = new GraphicsPath();
+        if (bounds.Width <= 0 || bounds.Height <= 0) return path;
+        var diameter = Math.Max(1, Math.Min(Math.Max(1, radius) * 2, Math.Min(bounds.Width, bounds.Height)));
         path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
         path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
         path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
@@ -52,26 +118,46 @@ public class RoundedPanel : Panel
             _ => control.BackColor
         };
     }
+
+    internal static Color Blend(Color from, Color to, float amount)
+    {
+        amount = Math.Clamp(amount, 0f, 1f);
+        return Color.FromArgb(
+            (int)Math.Round(from.A + (to.A - from.A) * amount),
+            (int)Math.Round(from.R + (to.R - from.R) * amount),
+            (int)Math.Round(from.G + (to.G - from.G) * amount),
+            (int)Math.Round(from.B + (to.B - from.B) * amount));
+    }
+
+    internal static Color WithAlpha(Color color, int alpha)
+    {
+        return Color.FromArgb(Math.Clamp(alpha, 0, 255), color);
+    }
+
+    internal static void DrawFocusRing(Graphics graphics, Rectangle bounds, int radius, Color color)
+    {
+        if (bounds.Width <= 2 || bounds.Height <= 2) return;
+        using var ring = RoundedRect(Rectangle.Inflate(bounds, -2, -2), Math.Max(1, radius - 2));
+        using var pen = new Pen(color, 1.4f);
+        graphics.DrawPath(pen, ring);
+    }
 }
+
 
 public sealed class DashedRoundedPanel : RoundedPanel
 {
     protected override void OnPaint(PaintEventArgs e)
     {
-        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        e.Graphics.Clear(VisualBackColor(Parent, BackColor));
-        using var path = RoundedRect(new Rectangle(1, 1, Width - 3, Height - 3), Radius);
-        using var fill = new SolidBrush(FillColor);
-        using var pen = new Pen(BorderColor, 1.2f) { DashPattern = new[] { 6f, 6f } };
-        e.Graphics.FillPath(fill, path);
-        e.Graphics.DrawPath(pen, path);
+        PaintRoundedSurface(e.Graphics, dashed: true);
     }
 }
 
 public sealed class RedGlowPanel : RoundedPanel
 {
-    public Color GlowColor { get; set; } = Color.FromArgb(125, 20, 28);
+    public RedGlowPanel()
+    {
+        GlowColor = Color.FromArgb(125, 20, 28);
+    }
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -321,7 +407,11 @@ public sealed class RoundedButton : Button
     public int Radius { get; set; } = 10;
     public Color FillColor { get; set; } = Color.FromArgb(32, 49, 75);
     public Color HoverColor { get; set; } = Color.FromArgb(43, 65, 99);
+    public Color PressedColor { get; set; } = Color.Empty;
     public Color BorderColor { get; set; } = Color.FromArgb(54, 78, 116);
+    public Color FocusBorderColor { get; set; } = Color.FromArgb(167, 139, 250);
+    public Color DisabledFillColor { get; set; } = Color.FromArgb(18, 27, 43);
+    public Color DisabledTextColor { get; set; } = Color.FromArgb(105, 119, 145);
     public string IconText { get; set; } = string.Empty;
     public Font? IconFont { get; set; }
     public int ContentLeftPadding { get; set; }
@@ -329,6 +419,7 @@ public sealed class RoundedButton : Button
     public Color AccentColor { get; set; } = Color.Empty;
     public int AccentWidth { get; set; }
     private bool _hover;
+    private bool _pressed;
 
     public RoundedButton()
     {
@@ -336,7 +427,8 @@ public sealed class RoundedButton : Button
         FlatAppearance.BorderSize = 0;
         BackColor = Color.FromArgb(32, 49, 75);
         Cursor = Cursors.Hand;
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        TabStop = true;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
     }
 
     protected override void OnMouseEnter(EventArgs e)
@@ -349,8 +441,51 @@ public sealed class RoundedButton : Button
     protected override void OnMouseLeave(EventArgs e)
     {
         _hover = false;
+        _pressed = false;
         Invalidate();
         base.OnMouseLeave(e);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            _pressed = true;
+            Focus();
+            Invalidate();
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            _pressed = false;
+            Invalidate();
+        }
+
+        base.OnMouseUp(e);
+    }
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnGotFocus(e);
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        _pressed = false;
+        Invalidate();
+        base.OnLostFocus(e);
+    }
+
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        Invalidate();
+        base.OnEnabledChanged(e);
     }
 
     protected override void OnPaint(PaintEventArgs pevent)
@@ -361,11 +496,25 @@ public sealed class RoundedButton : Button
         graphics.Clear(RoundedPanel.VisualBackColor(Parent, BackColor));
 
         var rect = new Rectangle(1, 1, Width - 3, Height - 3);
+        var currentFill = !Enabled
+            ? DisabledFillColor
+            : _pressed ? (PressedColor.IsEmpty ? RoundedPanel.Blend(HoverColor, Color.Black, 0.12f) : PressedColor)
+            : _hover ? HoverColor : FillColor;
+        var currentBorder = Focused && Enabled ? FocusBorderColor : BorderColor;
         using var path = RoundedPanel.RoundedRect(rect, Radius);
-        using var fill = new SolidBrush(_hover ? HoverColor : FillColor);
-        using var pen = new Pen(BorderColor, 1f);
+        using var fill = new SolidBrush(currentFill);
+        using var pen = new Pen(currentBorder, Focused && Enabled ? 1.35f : 1f);
         graphics.FillPath(fill, path);
+        using (var highlight = new Pen(RoundedPanel.WithAlpha(Color.White, _hover || Focused ? 34 : 18), 1f))
+        {
+            graphics.DrawLine(highlight, rect.Left + Radius, rect.Top + 1, rect.Right - Radius, rect.Top + 1);
+        }
         graphics.DrawPath(pen, path);
+        if (Focused && Enabled)
+        {
+            RoundedPanel.DrawFocusRing(graphics, rect, Radius, FocusBorderColor);
+        }
+
         if (!AccentColor.IsEmpty && AccentWidth > 0)
         {
             var accentBounds = new Rectangle(rect.Left + 8, rect.Top + 14, AccentWidth, Math.Max(0, rect.Height - 28));
@@ -374,6 +523,7 @@ public sealed class RoundedButton : Button
             graphics.FillPath(accentBrush, accentPath);
         }
 
+        var textColor = Enabled ? ForeColor : DisabledTextColor;
         if (string.IsNullOrEmpty(IconText))
         {
             TextRenderer.DrawText(
@@ -381,7 +531,7 @@ public sealed class RoundedButton : Button
                 Text,
                 Font,
                 rect,
-                ForeColor,
+                textColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             return;
         }
@@ -392,7 +542,7 @@ public sealed class RoundedButton : Button
             IconText,
             IconFont ?? Font,
             iconBounds,
-            ForeColor,
+            textColor,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
         var textLeft = iconBounds.Right + IconTextGap;
@@ -402,7 +552,7 @@ public sealed class RoundedButton : Button
             Text,
             Font,
             textBounds,
-            ForeColor,
+            textColor,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
     }
 
@@ -427,11 +577,13 @@ public sealed partial class ThemedTextBox : TextBox
     public Color FillColor { get; set; } = Color.FromArgb(3, 11, 20);
     public Color FocusedFillColor { get; set; } = Color.FromArgb(6, 18, 32);
     public Color BorderColor { get; set; } = Color.FromArgb(54, 78, 116);
+    public Color HoverBorderColor { get; set; } = Color.FromArgb(73, 106, 153);
     public Color FocusedBorderColor { get; set; } = Color.FromArgb(126, 58, 242);
     public Color TextColor { get; set; } = Color.White;
     public Color PlaceholderColor { get; set; } = Color.FromArgb(118, 137, 163);
     public int Radius { get; set; } = 8;
     private string _centeredPlaceholderText = string.Empty;
+    private bool _hover;
 
     public string CenteredPlaceholderText
     {
@@ -491,12 +643,14 @@ public sealed partial class ThemedTextBox : TextBox
 
     protected override void OnMouseEnter(EventArgs e)
     {
+        _hover = true;
         base.OnMouseEnter(e);
         PaintChrome();
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
+        _hover = false;
         base.OnMouseLeave(e);
         PaintChrome();
     }
@@ -533,9 +687,14 @@ public sealed partial class ThemedTextBox : TextBox
         {
             using var graphics = Graphics.FromHdc(hdc);
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var border = new Pen(Focused ? FocusedBorderColor : BorderColor, 1.15f);
+            var borderColor = Focused ? FocusedBorderColor : _hover ? HoverBorderColor : BorderColor;
+            using var border = new Pen(borderColor, Focused ? 1.35f : 1.15f);
             using var path = RoundedPanel.RoundedRect(new Rectangle(1, 1, Width - 3, Height - 3), Math.Max(1, Radius - 1));
             graphics.DrawPath(border, path);
+            if (Focused)
+            {
+                RoundedPanel.DrawFocusRing(graphics, new Rectangle(0, 0, Width - 1, Height - 1), Radius, FocusedBorderColor);
+            }
 
             if (!Focused && TextLength == 0 && !string.IsNullOrWhiteSpace(CenteredPlaceholderText))
             {
@@ -632,7 +791,9 @@ public sealed class ThemedComboBox : Control
     public event EventHandler? SelectedIndexChanged;
 
     public Color FillColor { get; set; } = Color.FromArgb(3, 11, 20);
+    public Color PressedFillColor { get; set; } = Color.FromArgb(8, 19, 35);
     public Color BorderColor { get; set; } = Color.FromArgb(54, 78, 116);
+    public Color HoverBorderColor { get; set; } = Color.FromArgb(73, 106, 153);
     public Color SelectedColor { get; set; } = Color.FromArgb(126, 58, 242);
     public Color TextColor { get; set; } = Color.White;
     public Color MutedColor { get; set; } = Color.FromArgb(177, 207, 242);
@@ -701,6 +862,12 @@ public sealed class ThemedComboBox : Control
         _hover = false;
         Invalidate();
         base.OnMouseLeave(e);
+    }
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnGotFocus(e);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -786,13 +953,14 @@ public sealed class ThemedComboBox : Control
 
         var bounds = new Rectangle(1, 1, Width - 3, Height - 3);
         var arrowBounds = new Rectangle(Math.Max(0, Width - 28), 1, 26, Math.Max(0, Height - 3));
-        var borderColor = Focused || _pressed ? SelectedColor : BorderColor;
-        var arrowColor = _hover || _pressed ? Color.FromArgb(18, 31, 51) : Color.FromArgb(14, 24, 40);
+        var borderColor = Focused || _pressed ? SelectedColor : _hover ? HoverBorderColor : BorderColor;
+        var fillColor = _pressed ? PressedFillColor : FillColor;
+        var arrowColor = _hover || _pressed ? RoundedPanel.Blend(PressedFillColor, SelectedColor, 0.18f) : Color.FromArgb(14, 24, 40);
 
-        using (var fill = new SolidBrush(FillColor))
+        using (var fill = new SolidBrush(fillColor))
         using (var arrowFill = new SolidBrush(arrowColor))
-        using (var border = new Pen(borderColor, 1f))
-        using (var divider = new Pen(BorderColor, 1f))
+        using (var border = new Pen(borderColor, Focused || _pressed ? 1.35f : 1f))
+        using (var divider = new Pen(_hover || Focused ? HoverBorderColor : BorderColor, 1f))
         using (var path = RoundedPanel.RoundedRect(bounds, Radius))
         {
             graphics.FillPath(fill, path);
@@ -800,7 +968,13 @@ public sealed class ThemedComboBox : Control
             graphics.FillRectangle(arrowFill, arrowBounds);
             graphics.DrawLine(divider, arrowBounds.Left, 4, arrowBounds.Left, Height - 5);
             graphics.ResetClip();
+            using var highlight = new Pen(RoundedPanel.WithAlpha(Color.White, Focused || _hover ? 32 : 16), 1f);
+            graphics.DrawLine(highlight, bounds.Left + Radius, bounds.Top + 1, bounds.Right - Radius, bounds.Top + 1);
             graphics.DrawPath(border, path);
+            if (Focused)
+            {
+                RoundedPanel.DrawFocusRing(graphics, bounds, Radius, SelectedColor);
+            }
         }
 
         var textBounds = new Rectangle(8, 0, Math.Max(0, Width - 42), Height);

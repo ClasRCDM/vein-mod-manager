@@ -10,22 +10,37 @@ namespace VEIN_Item_And_Container_Modifier;
 
 public sealed partial class MainForm : Form
 {
-    private static readonly Color AppBack = Color.FromArgb(4, 7, 14);
-    private static readonly Color PanelBack = Color.FromArgb(9, 15, 27);
-    private static readonly Color InnerBack = Color.FromArgb(6, 11, 21);
-    private static readonly Color SidebarBack = Color.FromArgb(8, 14, 25);
-    private static readonly Color Border = Color.FromArgb(28, 47, 76);
-    private static readonly Color BorderSoft = Color.FromArgb(21, 36, 58);
-    private static readonly Color TextMain = Color.White;
-    private static readonly Color TextMuted = Color.FromArgb(184, 199, 224);
-    private static readonly Color TextDim = Color.FromArgb(128, 142, 169);
-    private static readonly Color Purple = Color.FromArgb(143, 18, 34);
-    private static readonly Color PurpleLight = Color.FromArgb(190, 38, 56);
-    private static readonly Color Green = Color.FromArgb(0, 255, 102);
-    private static readonly Color Orange = Color.FromArgb(255, 112, 0);
-    private static readonly Color Amber = Color.FromArgb(240, 167, 60);
-    private static readonly Color Red = Color.FromArgb(255, 87, 87);
-    private static readonly Color Cyan = Color.FromArgb(18, 223, 213);
+    private static readonly Color AppBack = Color.FromArgb(3, 6, 13);
+    private static readonly Color AppGlowRed = Color.FromArgb(115, 18, 31);
+    private static readonly Color AppGlowPurple = Color.FromArgb(52, 39, 117);
+    private static readonly Color SurfaceChrome = Color.FromArgb(10, 12, 20);
+    private static readonly Color SurfaceRail = Color.FromArgb(7, 12, 23);
+    private static readonly Color PanelBack = Color.FromArgb(9, 15, 28);
+    private static readonly Color InnerBack = Color.FromArgb(5, 11, 22);
+    private static readonly Color SurfaceRaised = Color.FromArgb(13, 21, 39);
+    private static readonly Color SurfaceCard = Color.FromArgb(12, 19, 35);
+    private static readonly Color SurfaceInset = Color.FromArgb(5, 10, 19);
+    private static readonly Color SidebarBack = Color.FromArgb(7, 12, 23);
+    private static readonly Color Border = Color.FromArgb(33, 54, 86);
+    private static readonly Color BorderSoft = Color.FromArgb(22, 38, 63);
+    private static readonly Color BorderStrong = Color.FromArgb(54, 78, 118);
+    private static readonly Color TextMain = Color.FromArgb(248, 250, 255);
+    private static readonly Color TextMuted = Color.FromArgb(190, 204, 229);
+    private static readonly Color TextDim = Color.FromArgb(130, 145, 174);
+    private static readonly Color BrandRed = Color.FromArgb(143, 18, 34);
+    private static readonly Color BrandRedHot = Color.FromArgb(205, 46, 62);
+    private static readonly Color BrandPurple = Color.FromArgb(126, 58, 242);
+    private static readonly Color BrandPurpleLight = Color.FromArgb(167, 139, 250);
+    private static readonly Color Purple = BrandRed;
+    private static readonly Color PurpleLight = BrandRedHot;
+    private static readonly Color Green = Color.FromArgb(53, 231, 132);
+    private static readonly Color Orange = Color.FromArgb(255, 145, 63);
+    private static readonly Color Amber = Color.FromArgb(245, 185, 76);
+    private static readonly Color Red = Color.FromArgb(255, 92, 102);
+    private static readonly Color Cyan = Color.FromArgb(56, 220, 213);
+    private const int RadiusSm = 8;
+    private const int RadiusMd = 12;
+    private const int RadiusLg = 18;
     private const int SidebarLeft = 20;
     private const int SidebarTop = 54;
     private const int SidebarWidth = 220;
@@ -211,6 +226,7 @@ public sealed partial class MainForm : Form
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
+        DrawAppBackground(e.Graphics, ClientSize);
         if (!IsDesignerHosted || Controls.Count > 0) return;
 
         DrawDesignerPreview(e.Graphics);
@@ -299,9 +315,9 @@ public sealed partial class MainForm : Form
         if (_sidebarFooter != null && _sidebar != null)
         {
             _sidebarFooter.Height = 120;
-            _sidebarFooter.Left = 2;
+            _sidebarFooter.Left = 8;
             _sidebarFooter.Top = Math.Max(0, _sidebar.Height - _sidebarFooter.Height - 20);
-            _sidebarFooter.Width = Math.Max(0, _sidebar.Width - 4);
+            _sidebarFooter.Width = Math.Max(0, _sidebar.Width - 16);
         }
 
         if (_settingsButton != null)
@@ -423,30 +439,51 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void DrawDesignerPreview(Graphics graphics)
+    private static void DrawAppBackground(Graphics graphics, Size size)
     {
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         graphics.Clear(AppBack);
+        DrawGlow(graphics, new Rectangle(-180, -120, 520, 420), AppGlowRed, 74);
+        DrawGlow(graphics, new Rectangle(size.Width - 760, 72, 760, 520), AppGlowPurple, 58);
+        DrawGlow(graphics, new Rectangle(180, size.Height - 380, 620, 420), Color.FromArgb(24, 75, 96), 34);
+    }
 
-        DrawPreviewPanel(graphics, new Rectangle(SidebarLeft, SidebarTop, SidebarWidth, 900), 18, SidebarBack, BorderSoft);
-        DrawPreviewLogo(graphics, new Rectangle(48, 112, 164, 150));
-        DrawPreviewLine(graphics, 40, 298, SidebarWidth - 44);
-        DrawPreviewTab(graphics, "Dashboard", 36, 256, SidebarWidth - 36, selected: false);
-        DrawPreviewTab(graphics, "Setup", 36, 326, SidebarWidth - 36, selected: false);
-        DrawPreviewTab(graphics, "Server Manager", 36, 396, SidebarWidth - 36, selected: false);
-        DrawPreviewTab(graphics, "Mods", 36, 466, SidebarWidth - 36, selected: false);
-        DrawPreviewTab(graphics, "Scripts", 36, 536, SidebarWidth - 36, selected: true);
-        DrawPreviewTab(graphics, "Log", 36, 606, SidebarWidth - 36, selected: false);
-        DrawPreviewPanel(graphics, new Rectangle(34, 868, SidebarWidth - 32, 120), 8, InnerBack, BorderSoft);
-        DrawPreviewText(graphics, "Vein Mod Manager", 50, 886, 9.5F, FontStyle.Regular, TextMuted, width: 150);
-        DrawPreviewText(graphics, "v1.0.0", 50, 912, 8.5F, FontStyle.Regular, TextDim, width: 150);
-        DrawPreviewText(graphics, "System Online", 50, 944, 8.5F, FontStyle.Bold, Green, width: 150);
+    private static void DrawGlow(Graphics graphics, Rectangle bounds, Color color, int alpha)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        using var path = new GraphicsPath();
+        path.AddEllipse(bounds);
+        using var brush = new PathGradientBrush(path)
+        {
+            CenterColor = Color.FromArgb(alpha, color),
+            SurroundColors = new[] { Color.FromArgb(0, color) }
+        };
+        graphics.FillPath(brush, path);
+    }
+
+    private void DrawDesignerPreview(Graphics graphics)
+    {
+        DrawAppBackground(graphics, new Size(1553, 1013));
+
+        DrawPreviewPanel(graphics, new Rectangle(SidebarLeft, SidebarTop, SidebarWidth, 900), RadiusLg, SurfaceRail, BorderSoft);
+        DrawPreviewLogo(graphics, new Rectangle(48, 88, 164, 136));
+        DrawPreviewLine(graphics, 40, 244, SidebarWidth - 44);
+        DrawPreviewTab(graphics, "Dashboard", 32, 264, SidebarWidth - 24, selected: false);
+        DrawPreviewTab(graphics, "Setup", 32, 334, SidebarWidth - 24, selected: false);
+        DrawPreviewTab(graphics, "Server Manager", 32, 404, SidebarWidth - 24, selected: false);
+        DrawPreviewTab(graphics, "Mods", 32, 474, SidebarWidth - 24, selected: false);
+        DrawPreviewTab(graphics, "Scripts", 32, 544, SidebarWidth - 24, selected: true);
+        DrawPreviewTab(graphics, "Log", 32, 614, SidebarWidth - 24, selected: false);
+        DrawPreviewPanel(graphics, new Rectangle(28, 868, SidebarWidth - 16, 120), RadiusMd, SurfaceInset, BorderSoft);
+        DrawPreviewText(graphics, "Vein Mod Manager", 48, 886, 9.5F, FontStyle.Regular, TextMuted, width: 150);
+        DrawPreviewText(graphics, "v1.0.0", 48, 912, 8.5F, FontStyle.Regular, TextDim, width: 150);
+        DrawPreviewText(graphics, "System Online", 48, 944, 8.5F, FontStyle.Bold, Green, width: 150);
 
         DrawPreviewText(graphics, "Scripts", ContentLeft, 96, 26, FontStyle.Bold, TextMain);
         DrawPreviewText(graphics, "Community automation for your server — scheduled tasks, webhooks and custom hooks.", ContentLeft + 2, 152, 12.5F, FontStyle.Regular, TextDim);
-        DrawPreviewPanel(graphics, new Rectangle(ContentLeft, 198, 1213, 66), 10, Color.FromArgb(8, 13, 27), BorderSoft);
-        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 18, 290, 574, 255), 12, Color.FromArgb(11, 18, 34), Color.FromArgb(22, 31, 52));
-        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 626, 290, 574, 255), 12, Color.FromArgb(11, 18, 34), Color.FromArgb(22, 31, 52));
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft, 198, 1213, 66), RadiusMd, SurfaceRaised, BorderSoft);
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 18, 290, 574, 255), RadiusMd, SurfaceCard, BorderSoft);
+        DrawPreviewPanel(graphics, new Rectangle(ContentLeft + 626, 290, 574, 255), RadiusMd, SurfaceCard, BorderSoft);
     }
 
     private static void DrawPreviewLogo(Graphics graphics, Rectangle bounds)
@@ -603,8 +640,15 @@ public sealed partial class MainForm : Form
             Left = 0,
             Top = 0,
             Width = ClientSize.Width,
-            Height = 52,
-            BackColor = Color.FromArgb(19, 21, 29)
+            Height = 54,
+            BackColor = SurfaceChrome
+        };
+        _titleBar.Paint += (_, e) =>
+        {
+            using var line = new Pen(Color.FromArgb(42, 51, 78));
+            using var glow = new LinearGradientBrush(new Rectangle(0, 0, Math.Max(1, _titleBar.Width), _titleBar.Height), Color.FromArgb(22, 24, 36), SurfaceChrome, LinearGradientMode.Vertical);
+            e.Graphics.FillRectangle(glow, _titleBar.ClientRectangle);
+            e.Graphics.DrawLine(line, 0, _titleBar.Height - 1, _titleBar.Width, _titleBar.Height - 1);
         };
         _titleBar.MouseDown += TitleBarMouseDown;
         Controls.Add(_titleBar);
@@ -614,18 +658,18 @@ public sealed partial class MainForm : Form
             var icon = new PictureBox
             {
                 Left = 22,
-                Top = 18,
-                Width = 20,
-                Height = 20,
+                Top = 16,
+                Width = 22,
+                Height = 22,
                 Image = iconImage,
                 SizeMode = PictureBoxSizeMode.Zoom,
-                BackColor = _titleBar.BackColor
+                BackColor = Color.Transparent
             };
             icon.MouseDown += TitleBarMouseDown;
             _titleBar.Controls.Add(icon);
         }
 
-        var title = MakeLabel("Vein Mod Manager", 56, 14, 220, 28, 10F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, _titleBar.BackColor);
+        var title = MakeLabel("VEIN Mod Manager", 58, 13, 240, 30, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent);
         title.MouseDown += TitleBarMouseDown;
         _titleBar.Controls.Add(title);
 
@@ -635,16 +679,6 @@ public sealed partial class MainForm : Form
         _titleBar.Controls.Add(_minimizeButton);
         _titleBar.Controls.Add(_maximizeButton);
         _titleBar.Controls.Add(_closeButton);
-
-        _titleBar.Controls.Add(new Panel
-        {
-            Left = 0,
-            Top = 51,
-            Width = ClientSize.Width,
-            Height = 1,
-            BackColor = Color.FromArgb(28, 32, 48),
-            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
-        });
     }
 
     private static Button MakeWindowButton(string text, Action action)
@@ -654,17 +688,17 @@ public sealed partial class MainForm : Form
             Text = text,
             Top = 0,
             Width = 48,
-            Height = 52,
+            Height = 54,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(19, 21, 29),
+            BackColor = SurfaceChrome,
             ForeColor = TextDim,
             Font = new Font("Segoe MDL2 Assets", 9F, FontStyle.Regular),
             TabStop = false,
             Cursor = Cursors.Hand
         };
         button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(31, 35, 49);
-        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(41, 46, 64);
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 38, 56);
+        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(49, 56, 78);
         button.Click += (_, _) => action();
         return button;
     }
@@ -689,38 +723,46 @@ public sealed partial class MainForm : Form
 
     private void BuildSidebar()
     {
-        _sidebar = NewPanel(18, SidebarLeft, SidebarTop, SidebarWidth, 740);
+        _sidebar = NewPanel(RadiusLg, SidebarLeft, SidebarTop, SidebarWidth, 740);
         _sidebar.FillColor = SidebarBack;
+        _sidebar.GradientTopColor = Color.FromArgb(12, 18, 33);
+        _sidebar.GradientBottomColor = Color.FromArgb(5, 10, 20);
         _sidebar.BorderColor = BorderSoft;
+        _sidebar.HighlightColor = Color.FromArgb(34, 255, 255, 255);
+        _sidebar.InnerShadowColor = Color.FromArgb(36, 0, 0, 0);
+        _sidebar.GlowColor = Color.FromArgb(95, BrandRed);
         Controls.Add(_sidebar);
 
         var logo = new VeinLogoPanel
         {
             Left = 28,
-            Top = 58,
+            Top = 36,
             Width = 164,
             Height = 136,
             BackColor = SidebarBack,
-            GlowColor = Color.FromArgb(185, 24, 38),
-            AccentColor = Color.FromArgb(185, 24, 38),
+            GlowColor = BrandRedHot,
+            AccentColor = BrandRedHot,
             MainColor = Color.White
         };
         _sidebar.Controls.Add(logo);
-        _sidebar.Controls.Add(Line(20, 200, SidebarWidth - 40));
+        _sidebar.Controls.Add(Line(20, 190, SidebarWidth - 40));
 
-        _sidebarFooter = NewPanel(8, 2, 814, SidebarWidth - 4, 120);
-        _sidebarFooter.FillColor = InnerBack;
+        _sidebarFooter = NewPanel(RadiusMd, 8, 814, SidebarWidth - 16, 120);
+        _sidebarFooter.FillColor = SurfaceInset;
+        _sidebarFooter.GradientTopColor = Color.FromArgb(13, 21, 38);
+        _sidebarFooter.GradientBottomColor = SurfaceInset;
         _sidebarFooter.BorderColor = BorderSoft;
+        _sidebarFooter.HighlightColor = Color.FromArgb(24, 255, 255, 255);
         _sidebarFooter.BackColor = SidebarBack;
-        _sidebarFooter.Controls.Add(MakeLabel("Vein Mod Manager", 18, 18, _sidebarFooter.Width - 36, 22, 9.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, InnerBack));
-        _sidebarFooter.Controls.Add(MakeLabel("v1.0.0", 18, 44, _sidebarFooter.Width - 36, 22, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, InnerBack));
-        _sidebarFooter.Controls.Add(MakeLabel("\u2022 System Online", 18, 76, 130, 24, 10F, FontStyle.Regular, Green, ContentAlignment.MiddleLeft, InnerBack));
+        _sidebarFooter.Controls.Add(MakeLabel("Vein Mod Manager", 18, 18, _sidebarFooter.Width - 36, 22, 9.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent));
+        _sidebarFooter.Controls.Add(MakeLabel("v1.0.0", 18, 44, _sidebarFooter.Width - 36, 22, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent));
+        _sidebarFooter.Controls.Add(MakeLabel("\u25CF System Online", 18, 76, 130, 24, 10F, FontStyle.Bold, Green, ContentAlignment.MiddleLeft, Color.Transparent));
         var footerSettings = MakeButton("\uE713", _sidebarFooter.Width - 42, 76, 30, 30, () => ShowTab("Settings"));
         footerSettings.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
-        footerSettings.FillColor = Color.FromArgb(16, 20, 30);
-        footerSettings.HoverColor = Color.FromArgb(26, 31, 44);
-        footerSettings.BorderColor = Color.FromArgb(36, 42, 56);
-        footerSettings.Radius = 8;
+        footerSettings.FillColor = Color.FromArgb(16, 22, 36);
+        footerSettings.HoverColor = Color.FromArgb(28, 35, 54);
+        footerSettings.BorderColor = BorderSoft;
+        footerSettings.Radius = RadiusSm;
         _sidebarFooter.Controls.Add(footerSettings);
         _sidebar.Controls.Add(_sidebarFooter);
     }
@@ -841,7 +883,7 @@ public sealed partial class MainForm : Form
         _tabPages["Scripts"] = BuildScriptsTab();
         _tabPages["Log"] = BuildLogTab();
 
-        var y = 202;
+        var y = 212;
         foreach (var title in new[] { "Dashboard", "Setup", "Server Manager", "Mods", "Scripts", "Log" })
         {
             var button = NewSidebarTabButton(title, 14, y);
@@ -880,20 +922,21 @@ public sealed partial class MainForm : Form
         {
             var selected = name.Equals(title, StringComparison.Ordinal);
             var scriptsButton = name.Equals("Scripts", StringComparison.Ordinal);
-            button.FillColor = selected ? (scriptsButton ? Color.FromArgb(63, 42, 128) : Purple) : InnerBack;
-            button.HoverColor = selected ? (scriptsButton ? Color.FromArgb(82, 55, 166) : PurpleLight) : Color.FromArgb(18, 31, 50);
-            button.BorderColor = selected ? (scriptsButton ? Color.FromArgb(126, 88, 255) : PurpleLight) : BorderSoft;
+            button.FillColor = selected ? (scriptsButton ? Color.FromArgb(42, 31, 86) : Color.FromArgb(78, 18, 32)) : Color.Transparent;
+            button.HoverColor = selected ? (scriptsButton ? Color.FromArgb(55, 42, 112) : Color.FromArgb(106, 24, 40)) : Color.FromArgb(18, 28, 47);
+            button.BorderColor = selected ? (scriptsButton ? BrandPurpleLight : BrandRedHot) : Color.Transparent;
+            button.FocusBorderColor = scriptsButton ? BrandPurpleLight : BrandRedHot;
             button.AccentWidth = selected ? 4 : 0;
-            button.AccentColor = scriptsButton ? Color.FromArgb(196, 181, 253) : PurpleLight;
+            button.AccentColor = scriptsButton ? BrandPurpleLight : BrandRedHot;
             button.Invalidate();
         }
 
         if (_settingsButton != null)
         {
             var settingsSelected = title.Equals("Settings", StringComparison.Ordinal);
-            _settingsButton.FillColor = settingsSelected ? Purple : InnerBack;
-            _settingsButton.HoverColor = settingsSelected ? PurpleLight : Color.FromArgb(18, 31, 50);
-            _settingsButton.BorderColor = settingsSelected ? PurpleLight : BorderSoft;
+            _settingsButton.FillColor = settingsSelected ? Color.FromArgb(78, 18, 32) : InnerBack;
+            _settingsButton.HoverColor = settingsSelected ? Color.FromArgb(106, 24, 40) : Color.FromArgb(18, 31, 50);
+            _settingsButton.BorderColor = settingsSelected ? BrandRedHot : BorderSoft;
             _settingsButton.Invalidate();
         }
 
@@ -932,9 +975,8 @@ public sealed partial class MainForm : Form
 
     private RoundedPanel BuildDashboardTab()
     {
-        var panel = NewPanel(12, 0, 0, 1020, 570);
-        panel.Controls.Add(MakeLabel("Dashboard", 28, 24, 360, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        panel.Controls.Add(MakeLabel("Overview, loaded data, config activity, and server status at a glance.", 30, 62, 760, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        var panel = NewContentPanel();
+        AddPageHero(panel, "Overview", "Dashboard", "Loaded data, config activity, server state, and recent actions at a glance.");
 
         AddDashboardMetric(panel, "Game Status", "Closed", "VEIN process", "GameStatus", 28, 112);
         AddDashboardMetric(panel, "UE4SS Status", "Missing", "Detected in game folder", "Ue4ssStatus", 274, 112);
@@ -983,9 +1025,14 @@ public sealed partial class MainForm : Form
 
     private void AddDashboardChart(Control parent, string title, string emptyText, string key, int x, int y, int w, int h)
     {
-        var chart = NewPanel(12, x, y, w, h);
-        chart.Controls.Add(MakeLabel(title, 20, 12, w - 40, 24, 12, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        var value = MakeLabel(emptyText, 20, 46, w - 40, h - 58, 11, FontStyle.Regular, TextMuted, ContentAlignment.MiddleCenter, PanelBack);
+        var chart = NewPanel(RadiusMd, x, y, w, h);
+        chart.FillColor = SurfaceCard;
+        chart.GradientTopColor = Color.FromArgb(15, 24, 44);
+        chart.GradientBottomColor = SurfaceCard;
+        chart.BorderColor = BorderSoft;
+        chart.HighlightColor = Color.FromArgb(22, 255, 255, 255);
+        chart.Controls.Add(MakeLabel(title, 20, 12, w - 40, 24, 12, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, chart.FillColor));
+        var value = MakeLabel(emptyText, 20, 46, w - 40, h - 58, 11, FontStyle.Regular, TextMuted, ContentAlignment.MiddleCenter, chart.FillColor);
         chart.Controls.Add(value);
         _dashboardValues[key] = value;
         parent.Controls.Add(chart);
@@ -1008,17 +1055,14 @@ public sealed partial class MainForm : Form
         _modsSubPages.Clear();
         _modsSubButtons.Clear();
 
-        var pageTitle = MakeLabel("Mods", 0, 0, 360, 42, 23, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent);
-        var subtitle = MakeLabel("Active mods loaded on your server. Enable, disable or remove them.", 0, 42, 780, 26, 11.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
-        panel.Controls.Add(pageTitle);
-        panel.Controls.Add(subtitle);
+        AddPageHero(panel, "Library", "Mods", "Active mods loaded on your server. Enable, disable, update, or inspect them.", 0, 0, 780, BrandRedHot);
 
         var x = 0;
         foreach (var (title, width) in new[] { ("Installed Mods", 112), ("Nexus Search", 112) })
         {
-            var button = NewTabButton(title, x, 78, width);
+            var button = NewTabButton(title, x, 82, width);
             button.Height = 38;
-            button.Radius = 8;
+            button.Radius = RadiusSm;
             button.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             button.Click += (_, _) => ShowModsSubTab(title);
             _modsSubButtons[title] = button;
@@ -1295,20 +1339,24 @@ public sealed partial class MainForm : Form
         panel.BorderColor = AppBack;
         panel.FillColor = AppBack;
 
-        panel.Controls.Add(MakeLabel("Scripts", 0, 24, 150, 48, 26F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack));
-        panel.Controls.Add(MakeLabel("Community automation for your server \u2014 scheduled tasks, webhooks and custom hooks.", 0, 82, 820, 30, 12.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, AppBack));
+        AddPageHero(panel, "Automation", "Scripts", "Community automation for your server — scheduled tasks, webhooks and custom hooks.", 0, 20, 840, BrandPurpleLight);
 
         var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
-        newScript.FillColor = Color.FromArgb(126, 58, 242);
+        newScript.FillColor = BrandPurple;
         newScript.HoverColor = Color.FromArgb(147, 82, 255);
-        newScript.BorderColor = Color.FromArgb(167, 139, 250);
-        newScript.Radius = 10;
+        newScript.PressedColor = Color.FromArgb(97, 42, 190);
+        newScript.BorderColor = BrandPurpleLight;
+        newScript.FocusBorderColor = BrandPurpleLight;
+        newScript.Radius = RadiusMd;
         newScript.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
         panel.Controls.Add(newScript);
 
-        var filterBar = NewPanel(10, 0, 128, 1213, 66);
-        filterBar.FillColor = Color.FromArgb(8, 13, 27);
-        filterBar.BorderColor = BorderSoft;
+        var filterBar = NewPanel(RadiusMd, 0, 128, 1213, 66);
+        filterBar.FillColor = SurfaceRaised;
+        filterBar.GradientTopColor = Color.FromArgb(16, 24, 46);
+        filterBar.GradientBottomColor = SurfaceRaised;
+        filterBar.BorderColor = Color.FromArgb(38, 46, 82);
+        filterBar.HighlightColor = Color.FromArgb(24, 255, 255, 255);
         panel.Controls.Add(filterBar);
         var selectedFilter = "All Scripts";
         Action<string>? applyScriptFilter = null;
@@ -1361,9 +1409,12 @@ public sealed partial class MainForm : Form
         panel.Controls.Add(backupCard);
         panel.Controls.Add(customZone);
 
-        var notice = NewPanel(10, 0, 788, 1213, 72);
-        notice.FillColor = Color.FromArgb(13, 14, 35);
-        notice.BorderColor = Color.FromArgb(28, 35, 70);
+        var notice = NewPanel(RadiusMd, 0, 788, 1213, 72);
+        notice.FillColor = Color.FromArgb(15, 17, 42);
+        notice.GradientTopColor = Color.FromArgb(18, 21, 52);
+        notice.GradientBottomColor = Color.FromArgb(12, 15, 34);
+        notice.BorderColor = Color.FromArgb(44, 52, 95);
+        notice.HighlightColor = Color.FromArgb(24, 255, 255, 255);
         var noticeIcon = new ScriptIconPanel
         {
             Kind = ScriptIconKind.Bulb,
@@ -1502,8 +1553,8 @@ public sealed partial class MainForm : Form
             Width = width,
             Height = 4,
             Radius = 2,
-            FillColor = Color.FromArgb(147, 82, 255),
-            BorderColor = Color.FromArgb(147, 82, 255),
+            FillColor = BrandPurpleLight,
+            BorderColor = BrandPurpleLight,
             BackColor = parent is RoundedPanel underlineParent ? underlineParent.FillColor : parent.BackColor,
             Visible = selected
         };
@@ -1543,15 +1594,22 @@ public sealed partial class MainForm : Form
 
     private RoundedPanel BuildScriptCard(string title, string subtitle, string description, string status, ScriptIconKind iconKind, bool enabled, int x, int y, int w, int h)
     {
-        var normalBorder = Color.FromArgb(22, 31, 52);
-        var hoverBorder = Color.FromArgb(65, 74, 116);
-        var card = NewPanel(12, x, y, w, h);
-        card.FillColor = Color.FromArgb(11, 18, 34);
+        var normalBorder = Color.FromArgb(28, 40, 70);
+        var hoverBorder = Color.FromArgb(96, 86, 158);
+        var card = NewPanel(RadiusMd, x, y, w, h);
+        card.FillColor = SurfaceCard;
+        card.GradientTopColor = Color.FromArgb(16, 25, 46);
+        card.GradientBottomColor = SurfaceCard;
         card.BorderColor = normalBorder;
+        card.HighlightColor = Color.FromArgb(28, 255, 255, 255);
+        card.GlowColor = enabled ? Color.FromArgb(34, BrandPurple) : Color.Empty;
 
-        var iconBox = NewPanel(8, 28, 28, 64, 64);
-        iconBox.FillColor = Color.FromArgb(16, 23, 43);
-        iconBox.BorderColor = Color.FromArgb(31, 38, 70);
+        var iconBox = NewPanel(RadiusMd, 28, 28, 64, 64);
+        iconBox.FillColor = Color.FromArgb(18, 27, 50);
+        iconBox.GradientTopColor = Color.FromArgb(27, 39, 72);
+        iconBox.GradientBottomColor = Color.FromArgb(14, 21, 40);
+        iconBox.BorderColor = Color.FromArgb(42, 52, 88);
+        iconBox.HighlightColor = Color.FromArgb(34, 255, 255, 255);
         var iconColor = iconKind == ScriptIconKind.Bell ? Color.FromArgb(255, 207, 64) : enabled ? TextMain : TextMuted;
         var iconPanel = new ScriptIconPanel
         {
@@ -1563,8 +1621,8 @@ public sealed partial class MainForm : Form
         iconBox.BackColor = card.FillColor;
         iconBox.Controls.Add(iconPanel);
 
-        var titleLabel = MakeLabel(title, 112, 30, w - 220, 30, 13.5F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, card.FillColor);
-        var subtitleLabel = MakeLabel(subtitle, 112, 60, w - 220, 24, 10.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, card.FillColor);
+        var titleLabel = MakeLabel(title, 112, 30, w - 220, 30, 13.5F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent);
+        var subtitleLabel = MakeLabel(subtitle, 112, 60, w - 220, 24, 10.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
         var toggle = new ToggleSwitch
         {
             BackColor = card.FillColor,
@@ -1574,10 +1632,10 @@ public sealed partial class MainForm : Form
             OffColor = Color.FromArgb(38, 45, 73),
             OffColor2 = Color.FromArgb(72, 83, 122)
         };
-        var descriptionLabel = MakeWrappedLabel(description, 28, 118, w - 56, 56, 11.5F, FontStyle.Regular, TextMuted, card.FillColor);
+        var descriptionLabel = MakeWrappedLabel(description, 28, 118, w - 56, 56, 11.5F, FontStyle.Regular, TextMuted, Color.Transparent);
         var divider = Line(28, h - 62, w - 56);
-        var statusDot = MakeLabel("\u25CF", 28, h - 43, 16, 24, 10F, FontStyle.Regular, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, card.FillColor);
-        var statusLabel = MakeLabel(status == "Active" ? "Active" : "Paused", 46, h - 42, 100, 24, 10F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, card.FillColor);
+        var statusDot = MakeLabel("\u25CF", 28, h - 43, 16, 24, 10F, FontStyle.Regular, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
+        var statusLabel = MakeLabel(status == "Active" ? "Active" : "Paused", 46, h - 42, 100, 24, 10F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
         var editLabel = MakeActionLabel("Edit", w - 148, h - 42, 44, 24, Color.FromArgb(167, 139, 250), () => ShowScriptEditorDialog(title, subtitle, description, enabled));
         var runLabel = MakeActionLabel("Run now", w - 96, h - 42, 80, 24, TextMuted, () => ShowScriptRunDialog(title, subtitle, description));
 
@@ -1597,7 +1655,8 @@ public sealed partial class MainForm : Form
         void SetCardHover(bool hover)
         {
             card.BorderColor = hover ? hoverBorder : normalBorder;
-            iconBox.BorderColor = hover ? Color.FromArgb(58, 66, 112) : Color.FromArgb(31, 38, 70);
+            card.GlowColor = hover ? Color.FromArgb(62, BrandPurple) : enabled ? Color.FromArgb(34, BrandPurple) : Color.Empty;
+            iconBox.BorderColor = hover ? BrandPurpleLight : Color.FromArgb(42, 52, 88);
             card.Invalidate();
             iconBox.Invalidate();
         }
@@ -1657,25 +1716,31 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildCustomScriptDropZone(int x, int y, int w, int h)
     {
         var normalZoneBorder = Color.FromArgb(91, 68, 175);
-        var hoverZoneBorder = Color.FromArgb(147, 82, 255);
+        var hoverZoneBorder = BrandPurpleLight;
         var normalPlusBorder = Color.FromArgb(75, 55, 150);
-        var hoverPlusBorder = Color.FromArgb(147, 82, 255);
+        var hoverPlusBorder = BrandPurpleLight;
         var zone = new DashedRoundedPanel
         {
             Left = x,
             Top = y,
             Width = w,
             Height = h,
-            Radius = 12,
-            FillColor = AppBack,
+            Radius = RadiusMd,
+            FillColor = Color.FromArgb(8, 12, 26),
+            GradientTopColor = Color.FromArgb(13, 19, 41),
+            GradientBottomColor = Color.FromArgb(6, 10, 22),
             BorderColor = normalZoneBorder,
-            BackColor = AppBack
+            BackColor = AppBack,
+            HighlightColor = Color.FromArgb(18, 255, 255, 255),
+            GlowColor = Color.FromArgb(42, BrandPurple)
         };
-        var plus = NewPanel(8, 0, 52, 54, 54);
-        plus.FillColor = Color.FromArgb(9, 14, 28);
+        var plus = NewPanel(RadiusMd, 0, 52, 54, 54);
+        plus.FillColor = Color.FromArgb(13, 18, 36);
+        plus.GradientTopColor = Color.FromArgb(22, 30, 58);
+        plus.GradientBottomColor = Color.FromArgb(10, 15, 30);
         plus.BorderColor = normalPlusBorder;
         plus.BackColor = zone.FillColor;
-        var plusLabel = MakeLabel("+", 0, 0, 54, 54, 21, FontStyle.Regular, Color.FromArgb(147, 82, 255), ContentAlignment.MiddleCenter, plus.FillColor);
+        var plusLabel = MakeLabel("+", 0, 0, 54, 54, 21, FontStyle.Regular, BrandPurpleLight, ContentAlignment.MiddleCenter, plus.FillColor);
         plus.Controls.Add(plusLabel);
         var titleLabel = MakeLabel("Add a custom script", 0, 128, w, 24, 11, FontStyle.Bold, TextMuted, ContentAlignment.MiddleCenter, zone.FillColor);
         var subtitleLabel = MakeLabel("Lua, Batch or PowerShell", 0, 156, w, 22, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleCenter, zone.FillColor);
@@ -1699,8 +1764,9 @@ public sealed partial class MainForm : Form
         {
             zone.BorderColor = hover ? hoverZoneBorder : normalZoneBorder;
             plus.BorderColor = hover ? hoverPlusBorder : normalPlusBorder;
-            plusLabel.ForeColor = hover ? Color.FromArgb(196, 181, 253) : Color.FromArgb(147, 82, 255);
+            plusLabel.ForeColor = hover ? Color.FromArgb(226, 218, 255) : BrandPurpleLight;
             titleLabel.ForeColor = hover ? TextMain : TextMuted;
+            zone.GlowColor = hover ? Color.FromArgb(76, BrandPurple) : Color.FromArgb(42, BrandPurple);
             zone.Invalidate();
             plus.Invalidate();
         }
@@ -1739,7 +1805,7 @@ public sealed partial class MainForm : Form
 
     private RoundedPanel BuildSetupTab()
     {
-        var panel = NewPanel(12, 0, 0, 1020, 570);
+        var panel = NewContentPanel();
         _setupSubPages.Clear();
         _setupSubButtons.Clear();
 
@@ -1780,9 +1846,9 @@ public sealed partial class MainForm : Form
         foreach (var (name, button) in _setupSubButtons)
         {
             var selected = name.Equals(title, StringComparison.Ordinal);
-            button.FillColor = selected ? Purple : InnerBack;
-            button.HoverColor = selected ? PurpleLight : Color.FromArgb(18, 31, 50);
-            button.BorderColor = selected ? PurpleLight : BorderSoft;
+            button.FillColor = selected ? Color.FromArgb(78, 18, 32) : SurfaceInset;
+            button.HoverColor = selected ? Color.FromArgb(106, 24, 40) : Color.FromArgb(18, 31, 50);
+            button.BorderColor = selected ? BrandRedHot : BorderSoft;
             button.Invalidate();
         }
     }
@@ -1790,11 +1856,10 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildSetupDetailsPane()
     {
         var panel = NewContentPanel();
-        panel.Controls.Add(MakeLabel("Setup", 28, 24, 300, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        var readme = MakeButton("Readme", 834, 20, 126, 44, ShowReadmePopup);
+        AddPageHero(panel, "Paths", "Setup", "Select your VEIN install and UE4SS mod folder. The editor writes generated overrides only.");
+        var readme = MakeButton("Readme", 834, 28, 126, 44, ShowReadmePopup);
         AddTip(readme, "Open the quick setup steps without leaving the manager.");
         panel.Controls.Add(readme);
-        panel.Controls.Add(MakeLabel("Select your VEIN install and the UE4SS mod folder. The editor writes generated overrides only.", 30, 62, 760, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
 
         panel.Controls.Add(MakeLabel("Game folder", 30, 112, 180, 28, 13, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
         _gameFolderBox = NewTextBox(30, 144, 660, 36);
@@ -1836,8 +1901,7 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildSettingsTab()
     {
         var panel = NewContentPanel();
-        panel.Controls.Add(MakeLabel("Settings", 28, 24, 300, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        panel.Controls.Add(MakeLabel("Import a generated config file, open the saved config folder, and control beginner help.", 30, 62, 820, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        AddPageHero(panel, "Preferences", "Settings", "Import generated config files, open saved folders, and control beginner help.");
 
         var configCard = NewPanel(14, 30, 112, 930, 248);
         configCard.BackColor = PanelBack;
@@ -1904,11 +1968,10 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildItemTab()
     {
         var panel = NewContentPanel();
-        panel.Controls.Add(MakeLabel("Item Editor", 28, 24, 300, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        panel.Controls.Add(MakeLabel("Edit one item or container, or apply a quick preset as a starting point.", 30, 62, 760, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        AddPageHero(panel, "Overrides", "Item Editor", "Edit one item or container, or apply a quick preset as a starting point.");
 
         var itemOverridesPane = BuildItemOverridesPane();
-        itemOverridesPane.Top = 104;
+        itemOverridesPane.Top = 120;
         panel.Controls.Add(itemOverridesPane);
 
         _itemCategoryCombo.SelectedIndex = 0;
@@ -1918,11 +1981,10 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildDefaultsTab()
     {
         var panel = NewContentPanel();
-        panel.Controls.Add(MakeLabel("Defaults", 28, 24, 300, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        panel.Controls.Add(MakeLabel("Set simple defaults for a whole category. Fields change based on what the category supports.", 30, 62, 760, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        AddPageHero(panel, "Defaults", "Category Defaults", "Set simple defaults for a whole category. Fields change based on what the category supports.");
 
         var defaultsPane = BuildDefaultsPane();
-        defaultsPane.Top = 104;
+        defaultsPane.Top = 120;
         panel.Controls.Add(defaultsPane);
 
         _categoryCombo.SelectedIndex = 0;
@@ -2016,9 +2078,8 @@ public sealed partial class MainForm : Form
         _serverSubPages.Clear();
         _serverSubButtons.Clear();
 
-        panel.Controls.Add(MakeLabel("Server Manager", 28, 24, 360, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        panel.Controls.Add(MakeLabel("Manage VEIN server setup, config backups, mod parity, logs, and helper packages.", 30, 62, 720, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        _serverTypeLabel = MakeLabel("Server Type", 594, 28, 110, 28, 12, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack);
+        AddPageHero(panel, "Operations", "Server Manager", "Manage VEIN server setup, safe restarts, config backups, mod parity, logs, and helper packages.", 28, 22, 650, BrandRedHot);
+        _serverTypeLabel = MakeLabel("Server Type", 594, 30, 110, 28, 12, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent);
         _serverTypeLabel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         panel.Controls.Add(_serverTypeLabel);
 
@@ -2094,9 +2155,9 @@ public sealed partial class MainForm : Form
         foreach (var (name, button) in _serverSubButtons)
         {
             var selected = name.Equals(title, StringComparison.Ordinal);
-            button.FillColor = selected ? Purple : InnerBack;
-            button.HoverColor = selected ? PurpleLight : Color.FromArgb(18, 31, 50);
-            button.BorderColor = selected ? PurpleLight : BorderSoft;
+            button.FillColor = selected ? Color.FromArgb(78, 18, 32) : SurfaceInset;
+            button.HoverColor = selected ? Color.FromArgb(106, 24, 40) : Color.FromArgb(18, 31, 50);
+            button.BorderColor = selected ? BrandRedHot : BorderSoft;
             button.Invalidate();
         }
 
@@ -2168,13 +2229,14 @@ public sealed partial class MainForm : Form
             AutoScrollMargin = new Size(0, 18)
         };
         _serverBackupsPane = page;
-        var section = NewServerSection("Backups", 0, 0, 456, 244);
+        var section = NewServerSection("Backups", 0, 0, 456, 260);
         page.Controls.Add(section);
         section.Controls.Add(MakeButton("Backup config now", 22, 46, 148, 42, BackupSelectedServerConfig, main: true));
         _backupBeforeSaveToggle = AddToggleRow(section, "Backup before save", 190, 46, isChecked: true);
         _backupBeforeUploadToggle = AddToggleRow(section, "Backup before upload", 190, 86, isChecked: true);
         _backupBeforeRestartToggle = AddToggleRow(section, "Verified save backup", 190, 126, isChecked: true);
         _backupBeforeRestartToggle.Enabled = false;
+        section.Controls.Add(MakeWrappedLabel("Verified save backup is mandatory for normal safe stop/restart and skipped only during corruption rollback.", 190, 166, 238, 52, 9.5F, FontStyle.Regular, TextDim, section.FillColor));
         AddTip(_backupBeforeRestartToggle, "Verified save backups are always refreshed after a verified safe stop and skipped only during corruption rollback.");
         _recentBackupsList = new ListBox
         {
@@ -2190,25 +2252,34 @@ public sealed partial class MainForm : Form
         _recentBackupsList.Items.Add("No backups yet");
         section.Controls.Add(_recentBackupsList);
 
-        var paths = NewServerSection("Safe Restart Paths", 476, 0, 456, 244);
+        var paths = NewServerSection("Safe Restart Paths", 476, 0, 456, 260);
         page.Controls.Add(paths);
         _windowsSaveDirectoryBox = AddCompactTextField(paths, "Save directory", 22, 54, 386, "");
         _windowsBackupDirectoryBox = AddCompactTextField(paths, "Verified backup directory", 22, 106, 386, "");
         _windowsLogFileBox = AddCompactTextField(paths, "Server log file", 22, 158, 386, "");
-        paths.Controls.Add(MakeButton("Use Defaults", 22, 198, 118, 34, FillWindowsSafetyDefaultsFromUi));
-        paths.Controls.Add(MakeButton("Scan Log", 156, 198, 118, 34, ScanWindowsCorruptionLogFromUi));
-        paths.Controls.Add(MakeButton("Restore Save", 290, 198, 118, 34, RestoreWindowsVerifiedBackupFromUi));
+        paths.Controls.Add(MakeWrappedLabel("Save mtime proves shutdown completed before the rolling backup is refreshed.", 22, 194, 386, 34, 9.5F, FontStyle.Regular, TextDim, paths.FillColor));
+        paths.Controls.Add(MakeButton("Use Defaults", 22, 226, 118, 34, FillWindowsSafetyDefaultsFromUi));
+        paths.Controls.Add(MakeButton("Scan Log", 156, 226, 118, 34, ScanWindowsCorruptionLogFromUi));
+        paths.Controls.Add(MakeButton("Restore Save", 290, 226, 118, 34, RestoreWindowsVerifiedBackupFromUi));
 
-        var parameters = NewServerSection("Safe Restart Parameters", 0, 264, 932, 126);
+        var parameters = NewServerSection("Safe Restart Parameters", 0, 282, 932, 154);
         parameters.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         page.Controls.Add(parameters);
-        _shutdownBudgetBox = AddCompactTextField(parameters, "Budget", 22, 58, 80, "60", numeric: true);
-        _forceIdleBox = AddCompactTextField(parameters, "Idle force", 122, 58, 80, "20", numeric: true);
-        _extendIntervalBox = AddCompactTextField(parameters, "Extend", 222, 58, 80, "15", numeric: true);
-        _startupWatchBox = AddCompactTextField(parameters, "Watch", 322, 58, 80, "90", numeric: true);
-        _corruptionThresholdBox = AddCompactTextField(parameters, "Threshold", 422, 58, 80, "25", numeric: true);
-        _autoRevertToggle = AddToggleRow(parameters, "Auto revert corrupt load", 548, 56, isChecked: false);
-        _logRotatesToggle = AddToggleRow(parameters, "Log rotates per launch", 724, 56, isChecked: true);
+        parameters.Controls.Add(MakeLabel("Graceful stop watches save writes, extends while files change, then scans startup for dynamic-load corruption.", 22, 36, 850, 20, 9.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, parameters.FillColor));
+        _shutdownBudgetBox = AddCompactTextField(parameters, "Budget", 22, 76, 80, "60", numeric: true);
+        _forceIdleBox = AddCompactTextField(parameters, "Idle force", 122, 76, 80, "20", numeric: true);
+        _extendIntervalBox = AddCompactTextField(parameters, "Extend", 222, 76, 80, "15", numeric: true);
+        _startupWatchBox = AddCompactTextField(parameters, "Watch", 322, 76, 80, "90", numeric: true);
+        _corruptionThresholdBox = AddCompactTextField(parameters, "Threshold", 422, 76, 80, "25", numeric: true);
+        _autoRevertToggle = AddToggleRow(parameters, "Auto revert corrupt load", 548, 74, isChecked: false);
+        _logRotatesToggle = AddToggleRow(parameters, "Log rotates per launch", 724, 74, isChecked: true);
+        var rollback = NewServerSection("Rollback Guard", 0, 458, 932, 96);
+        rollback.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        rollback.BorderColor = Color.FromArgb(96, 60, 42);
+        rollback.GlowColor = Color.FromArgb(32, Orange);
+        page.Controls.Add(rollback);
+        rollback.Controls.Add(MakeLabel("\uE7BA", 24, 36, 34, 30, 15F, FontStyle.Regular, Amber, ContentAlignment.MiddleCenter, rollback.FillColor));
+        rollback.Controls.Add(MakeWrappedLabel("If startup corruption is detected, rollback stops the server without refreshing the backup, restores the verified mirror, then relaunches cleanly.", 70, 34, 820, 42, 10.5F, FontStyle.Bold, TextMuted, rollback.FillColor));
         AddTip(_windowsSaveDirectoryBox, "Directory watched during shutdown and mirrored only after a verified save write.");
         AddTip(_windowsBackupDirectoryBox, "Single last-known-good save mirror used for rollback.");
         AddTip(_windowsLogFileBox, "VEIN log scanned for Tried to load dynamic component during startup.");
@@ -2626,9 +2697,14 @@ public sealed partial class MainForm : Form
 
     private static RoundedPanel NewServerSection(string title, int x, int y, int w, int h)
     {
-        var section = NewPanel(12, x, y, w, h);
+        var section = NewPanel(RadiusMd, x, y, w, h);
+        section.FillColor = SurfaceCard;
+        section.GradientTopColor = Color.FromArgb(15, 24, 44);
+        section.GradientBottomColor = SurfaceCard;
+        section.BorderColor = BorderSoft;
+        section.HighlightColor = Color.FromArgb(24, 255, 255, 255);
         section.BackColor = PanelBack;
-        section.Controls.Add(MakeLabel(title, 22, 8, w - 44, 22, 13F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
+        section.Controls.Add(MakeLabel(title, 22, 10, w - 44, 22, 13F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, section.FillColor));
         return section;
     }
 
@@ -3614,12 +3690,13 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildLogTab()
     {
         var panel = NewContentPanel();
-        panel.Controls.Add(MakeLabel("Status Log", 28, 24, 300, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        panel.Controls.Add(MakeLabel("Copy friendly status messages, backup paths, and errors from here.", 30, 62, 760, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        AddPageHero(panel, "Activity", "Status Log", "Copy friendly status messages, backup paths, safe-restart events, and errors from here.");
 
-        var logShell = NewPanel(12, 30, 112, 930, 330);
+        var logShell = NewPanel(RadiusMd, 30, 116, 930, 330);
         logShell.BackColor = PanelBack;
-        logShell.FillColor = InnerBack;
+        logShell.FillColor = SurfaceInset;
+        logShell.GradientTopColor = Color.FromArgb(7, 13, 25);
+        logShell.GradientBottomColor = SurfaceInset;
         logShell.BorderColor = Border;
         panel.Controls.Add(logShell);
 
@@ -4626,7 +4703,31 @@ public sealed partial class MainForm : Form
 
     private static RoundedPanel NewContentPanel()
     {
-        return NewPanel(12, 0, 0, 1020, 512);
+        var panel = NewPanel(RadiusMd, 0, 0, 1020, 512);
+        panel.FillColor = PanelBack;
+        panel.BorderColor = BorderSoft;
+        panel.HighlightColor = Color.FromArgb(22, 255, 255, 255);
+        panel.InnerShadowColor = Color.FromArgb(24, 0, 0, 0);
+        return panel;
+    }
+
+    private static void AddPageHero(Control parent, string eyebrow, string title, string subtitle, int x = 28, int y = 22, int width = 860, Color? accentColor = null)
+    {
+        var accent = accentColor ?? BrandRedHot;
+        var back = ParentSurface(parent);
+        var rail = NewPanel(3, x, y + 7, 5, 60);
+        rail.FillColor = accent;
+        rail.BorderColor = accent;
+        rail.BackColor = back;
+        parent.Controls.Add(rail);
+        parent.Controls.Add(MakeLabel(eyebrow.ToUpperInvariant(), x + 20, y, width, 18, 8.5F, FontStyle.Bold, TextDim, ContentAlignment.MiddleLeft, Color.Transparent));
+        parent.Controls.Add(MakeLabel(title, x + 20, y + 20, width, 34, 20F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent));
+        parent.Controls.Add(MakeLabel(subtitle, x + 22, y + 58, width, 26, 11.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent));
+    }
+
+    private static Color ParentSurface(Control parent)
+    {
+        return parent is RoundedPanel panel ? panel.FillColor : parent.BackColor;
     }
 
     private static FlowLayoutPanel NewFieldFlow(int x, int y, int w, int h)
@@ -4791,9 +4892,13 @@ public sealed partial class MainForm : Form
             ShowInTaskbar = false
         };
         popup.Shown += (_, _) => UseDarkTitleBar(popup.Handle);
-        shell = NewPanel(14, 18, 18, width - 36, height - 36);
-        shell.FillColor = Color.FromArgb(9, 15, 30);
-        shell.BorderColor = Color.FromArgb(39, 48, 86);
+        shell = NewPanel(RadiusLg, 18, 18, width - 36, height - 36);
+        shell.FillColor = PanelBack;
+        shell.GradientTopColor = Color.FromArgb(14, 22, 42);
+        shell.GradientBottomColor = PanelBack;
+        shell.BorderColor = Color.FromArgb(48, 60, 104);
+        shell.HighlightColor = Color.FromArgb(26, 255, 255, 255);
+        shell.GlowColor = Color.FromArgb(34, BrandPurple);
         shell.BackColor = AppBack;
         popup.Controls.Add(shell);
         return popup;
@@ -4983,21 +5088,26 @@ public sealed partial class MainForm : Form
             Radius = radius,
             FillColor = PanelBack,
             BorderColor = Border,
+            HighlightColor = Color.FromArgb(18, 255, 255, 255),
+            InnerShadowColor = Color.FromArgb(18, 0, 0, 0),
             BackColor = AppBack
         };
     }
 
     private static RoundedPanel NewStatCard(string title, string value, string sub, Color valueColor, int x, int y, int w, int h)
     {
-        var panel = NewPanel(12, x, y, w, h);
-        panel.FillColor = Color.FromArgb(10, 17, 31);
+        var panel = NewPanel(RadiusMd, x, y, w, h);
+        panel.FillColor = SurfaceCard;
+        panel.GradientTopColor = Color.FromArgb(15, 24, 44);
+        panel.GradientBottomColor = SurfaceCard;
         panel.BorderColor = BorderSoft;
+        panel.HighlightColor = Color.FromArgb(26, 255, 255, 255);
         const int textLeft = 22;
         const int valueLeft = 20;
         panel.Controls.Add(MakeLabel(title, textLeft, 12, w - 44, 20, 10.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, panel.FillColor));
-        var valueLabel = MakeLabel(value, valueLeft, 30, w - 42, 30, 16, FontStyle.Regular, valueColor, ContentAlignment.MiddleLeft, panel.FillColor);
+        var valueLabel = MakeLabel(value, valueLeft, 30, w - 42, 30, 16, FontStyle.Bold, valueColor, ContentAlignment.MiddleLeft, panel.FillColor);
         panel.Controls.Add(valueLabel);
-        panel.Controls.Add(MakeLabel(sub, textLeft, 60, w - 44, 18, 8.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, panel.FillColor));
+        panel.Controls.Add(MakeLabel(sub, textLeft, 60, w - 44, 18, 8.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, panel.FillColor));
         panel.Tag = valueLabel;
         return panel;
     }
@@ -5074,13 +5184,15 @@ public sealed partial class MainForm : Form
             Top = y,
             Width = w,
             Height = h,
-            Radius = 9,
-            FillColor = main ? Purple : Color.FromArgb(29, 44, 69),
-            HoverColor = main ? PurpleLight : Color.FromArgb(38, 57, 88),
-            BorderColor = main ? PurpleLight : Color.FromArgb(49, 70, 105),
+            Radius = RadiusSm + 1,
+            FillColor = main ? BrandRed : Color.FromArgb(29, 44, 69),
+            HoverColor = main ? BrandRedHot : Color.FromArgb(42, 61, 94),
+            PressedColor = main ? Color.FromArgb(112, 14, 29) : Color.FromArgb(22, 35, 56),
+            BorderColor = main ? BrandRedHot : BorderStrong,
+            FocusBorderColor = main ? BrandRedHot : BrandPurpleLight,
             ForeColor = TextMain,
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            TabStop = false,
+            TabStop = true,
             FlatStyle = FlatStyle.Flat
         };
     }
@@ -5094,10 +5206,12 @@ public sealed partial class MainForm : Form
             Top = y,
             Width = width,
             Height = 44,
-            Radius = 12,
-            FillColor = InnerBack,
+            Radius = RadiusMd,
+            FillColor = SurfaceInset,
             HoverColor = Color.FromArgb(18, 31, 50),
+            PressedColor = Color.FromArgb(22, 36, 58),
             BorderColor = BorderSoft,
+            FocusBorderColor = BrandRedHot,
             ForeColor = TextMain,
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat
@@ -5109,19 +5223,21 @@ public sealed partial class MainForm : Form
         return new RoundedButton
         {
             Text = text,
-            Left = 2,
+            Left = 8,
             Top = y,
-            Width = SidebarWidth - 4,
-            Height = 60,
-            Radius = 8,
-            FillColor = InnerBack,
-            HoverColor = Color.FromArgb(15, 25, 43),
-            BorderColor = BorderSoft,
+            Width = SidebarWidth - 16,
+            Height = 58,
+            Radius = RadiusMd,
+            FillColor = Color.Transparent,
+            HoverColor = Color.FromArgb(18, 28, 47),
+            PressedColor = Color.FromArgb(24, 36, 58),
+            BorderColor = Color.Transparent,
+            FocusBorderColor = BrandPurpleLight,
             ForeColor = TextMain,
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             IconText = SidebarIconFor(text),
             IconFont = text.Equals("Scripts", StringComparison.Ordinal) ? new Font("Segoe UI", 11F, FontStyle.Bold) : new Font("Segoe MDL2 Assets", 12F, FontStyle.Regular),
-            ContentLeftPadding = 24,
+            ContentLeftPadding = 26,
             IconTextGap = 14,
             FlatStyle = FlatStyle.Flat
         };
