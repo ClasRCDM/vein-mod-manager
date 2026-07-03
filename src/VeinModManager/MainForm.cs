@@ -1912,7 +1912,7 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildSetupDetailsPane()
     {
         var panel = NewContentPanel();
-        AddPageHero(panel, "Paths", "Setup", "Select your VEIN install and UE4SS mod folder. The editor writes generated overrides only.");
+        AddPageHero(panel, "Paths", "Setup", "Select your VEIN install and UE4SS mod folder. The editor writes generated overrides only.", 28, 22, 720);
         var readme = MakeButton("Readme", 834, 28, 126, 44, ShowReadmePopup);
         AddTip(readme, "Open the quick setup steps without leaving the manager.");
         panel.Controls.Add(readme);
