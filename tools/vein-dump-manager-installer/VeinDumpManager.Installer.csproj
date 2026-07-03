@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Vein Dump Manager Installer</AssemblyName>
+    <AssemblyTitle>Vein Dump Manager Installer</AssemblyTitle>
+    <Product>Vein Dump Manager</Product>
+    <FileDescription>Installer and dependency bootstrapper for Vein Dump Manager</FileDescription>
+    <ApplicationIcon>..\vein-ue4ss-control-panel\Assets\vein-logo.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="..\vein-ue4ss-control-panel\Assets\vein-logo.ico">
+      <Link>Assets\vein-logo.ico</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Assets\installer-logo.png">
+      <Link>Assets\installer-logo.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Assets\UE4SS-Vein-runtime\**\*">
+      <Link>Assets\UE4SS-Vein-runtime\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\vein-ue4ss-control-panel\bin\Release\VeinDumpManager-ready-to-ship\**\*">
+      <Link>payload\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

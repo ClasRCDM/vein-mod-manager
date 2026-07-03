@@ -1,0 +1,34 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+*.nupkg
+
+# Local secrets and machine-only config
+.env
+*.env
+secrets/
+
+# Runtime dump output
+Dumps/
+Logs/
+Exports/
+GameFiles/
+VEIN_MasterDump_*/
+VEIN_Dump_Control/
+*.log
+*.jsonl
+
+# Release artifacts are uploaded to GitHub Releases, not committed.
+dist/
+release/
+outputs/
+*.zip
+*.7z
+*.rar
+
+# OS noise
+Thumbs.db
+Desktop.ini
