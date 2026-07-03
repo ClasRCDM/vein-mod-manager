@@ -42,13 +42,13 @@ public sealed partial class MainForm : Form
     private const int RadiusMd = 12;
     private const int RadiusLg = 18;
     private const int SidebarLeft = 20;
-    private const int SidebarTop = 54;
+    private const int SidebarTop = 74;
     private const int SidebarWidth = 220;
     private const int ContentLeft = 296;
     private const int ContentRightPadding = 44;
-    private const int ContentTop = 154;
+    private const int ContentTop = 174;
     private const int ScriptsContentTop = 70;
-    private const int ServerContentTop = 262;
+    private const int ServerContentTop = 282;
     private const int ResizeBorderWidth = 8;
     private const int MaxVisibleComboRows = 14;
     private static readonly string[] BoolChoices = { "Game Default", "True", "False" };
@@ -376,7 +376,7 @@ public sealed partial class MainForm : Form
         if (_serverOverviewControls.Count > 0)
         {
             var x = ContentLeft;
-            var y = 154;
+            var y = 174;
             var gap = 18;
             var available = Math.Max(900, ClientSize.Width - x - ContentRightPadding);
             var cardWidth = Math.Max(210, Math.Min(250, (available - gap * 3) / 4));
@@ -739,7 +739,7 @@ public sealed partial class MainForm : Form
             Top = 36,
             Width = 164,
             Height = 136,
-            BackColor = SidebarBack,
+            BackColor = Color.Transparent,
             GlowColor = BrandRedHot,
             AccentColor = BrandRedHot,
             MainColor = Color.White
@@ -793,12 +793,12 @@ public sealed partial class MainForm : Form
 
     private void BuildHeader()
     {
-        _headerTitle = MakeLabel("Vein Manager", ContentLeft, 54, 610, 44, 28, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack);
+        _headerTitle = MakeLabel("Vein Manager", ContentLeft, 74, 610, 44, 28, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, AppBack);
         Controls.Add(_headerTitle);
-        _headerSubtitle = MakeLabel("Modify VEIN item, backpack, vehicle, and container values without editing config files.", ContentLeft + 2, 100, 880, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, AppBack);
+        _headerSubtitle = MakeLabel("Modify VEIN item, backpack, vehicle, and container values without editing config files.", ContentLeft + 2, 120, 880, 28, 13, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, AppBack);
         Controls.Add(_headerSubtitle);
 
-        _settingsButton = MakeButton("\uE713", 1196, 50, 52, 52, () => ShowTab("Settings"));
+        _settingsButton = MakeButton("\uE713", 1196, 70, 52, 52, () => ShowTab("Settings"));
         _settingsButton.AccessibleName = "Settings";
         _settingsButton.Font = new Font("Segoe MDL2 Assets", 17F, FontStyle.Regular);
         _settingsButton.FillColor = InnerBack;
@@ -812,7 +812,7 @@ public sealed partial class MainForm : Form
     {
         _overviewControls.Clear();
         var x = ContentLeft;
-        var y = 154;
+        var y = 174;
         var w = 260;
         var h = 92;
         var gap = 18;
@@ -837,7 +837,7 @@ public sealed partial class MainForm : Form
     {
         _serverOverviewControls.Clear();
         var x = ContentLeft;
-        var y = 154;
+        var y = 174;
         var w = 220;
         var h = 92;
         var gap = 18;
@@ -1031,8 +1031,8 @@ public sealed partial class MainForm : Form
         chart.GradientBottomColor = SurfaceCard;
         chart.BorderColor = BorderSoft;
         chart.HighlightColor = Color.FromArgb(22, 255, 255, 255);
-        chart.Controls.Add(MakeLabel(title, 20, 12, w - 40, 24, 12, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, chart.FillColor));
-        var value = MakeLabel(emptyText, 20, 46, w - 40, h - 58, 11, FontStyle.Regular, TextMuted, ContentAlignment.MiddleCenter, chart.FillColor);
+        chart.Controls.Add(MakeLabel(title, 20, 12, w - 40, 24, 12, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent));
+        var value = MakeLabel(emptyText, 20, 46, w - 40, h - 58, 11, FontStyle.Regular, TextMuted, ContentAlignment.MiddleCenter, Color.Transparent);
         chart.Controls.Add(value);
         _dashboardValues[key] = value;
         parent.Controls.Add(chart);
@@ -1060,7 +1060,7 @@ public sealed partial class MainForm : Form
         var x = 0;
         foreach (var (title, width) in new[] { ("Installed Mods", 112), ("Nexus Search", 112) })
         {
-            var button = NewTabButton(title, x, 82, width);
+            var button = NewTabButton(title, x, 104, width);
             button.Height = 38;
             button.Radius = RadiusSm;
             button.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
@@ -1075,7 +1075,7 @@ public sealed partial class MainForm : Form
 
         foreach (var page in _modsSubPages.Values)
         {
-            page.Top = 126;
+            page.Top = 154;
             page.Width = panel.Width;
             page.Height = Math.Max(420, panel.Height - page.Top);
             page.Visible = false;
@@ -1531,7 +1531,7 @@ public sealed partial class MainForm : Form
             }
             else
             {
-                var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, selected ? TextMain : TextDim, ContentAlignment.MiddleCenter, tabBack);
+                var iconLabel = MakeLabel(icon, x, 17, 22, 24, 11F, FontStyle.Regular, selected ? TextMain : TextDim, ContentAlignment.MiddleCenter, Color.Transparent);
                 iconLabel.Font = new Font("Segoe MDL2 Assets", 11F, FontStyle.Regular);
                 iconLabel.Cursor = Cursors.Hand;
                 iconLabel.Click += (_, _) => action();
@@ -1540,8 +1540,7 @@ public sealed partial class MainForm : Form
             }
         }
 
-        var labelBack = parent is RoundedPanel labelParent ? labelParent.FillColor : parent.BackColor;
-        var label = MakeLabel(text, textLeft, 16, width, 32, 10.5F, FontStyle.Bold, selected ? TextMain : TextDim, ContentAlignment.MiddleLeft, labelBack);
+        var label = MakeLabel(text, textLeft, 16, width, 32, 10.5F, FontStyle.Bold, selected ? TextMain : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
         label.Cursor = Cursors.Hand;
         label.Click += (_, _) => action();
         parent.Controls.Add(label);
@@ -2078,7 +2077,7 @@ public sealed partial class MainForm : Form
         _serverSubPages.Clear();
         _serverSubButtons.Clear();
 
-        AddPageHero(panel, "Operations", "Server Manager", "Manage VEIN server setup, safe restarts, config backups, mod parity, logs, and helper packages.", 28, 22, 650, BrandRedHot);
+        AddPageHero(panel, "Operations", "Server Manager", "Setup, safe restarts, backups, mod parity, logs, and helper packages.", 28, 22, 650, BrandRedHot);
         _serverTypeLabel = MakeLabel("Server Type", 594, 30, 110, 28, 12, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent);
         _serverTypeLabel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         panel.Controls.Add(_serverTypeLabel);
@@ -2092,7 +2091,7 @@ public sealed partial class MainForm : Form
         _serverTabFlow = new FlowLayoutPanel
         {
             Left = 28,
-            Top = 104,
+            Top = 130,
             Width = 964,
             Height = 92,
             BackColor = PanelBack,
@@ -2129,7 +2128,7 @@ public sealed partial class MainForm : Form
         foreach (var page in _serverSubPages.Values)
         {
             page.Left = 28;
-            page.Top = 204;
+            page.Top = 230;
             page.Width = 964;
             page.Height = 300;
             page.Visible = false;
@@ -2704,13 +2703,13 @@ public sealed partial class MainForm : Form
         section.BorderColor = BorderSoft;
         section.HighlightColor = Color.FromArgb(24, 255, 255, 255);
         section.BackColor = PanelBack;
-        section.Controls.Add(MakeLabel(title, 22, 10, w - 44, 22, 13F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, section.FillColor));
+        section.Controls.Add(MakeLabel(title, 22, 10, w - 44, 22, 13F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent));
         return section;
     }
 
     private static (Label Label, ThemedTextBox Box, RoundedButton Button) AddPathField(Control parent, string label, int x, int y, int width, string buttonText, bool browseFolder)
     {
-        var fieldLabel = MakeLabel(label, x, y - 24, width, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack);
+        var fieldLabel = MakeLabel(label, x, y - 24, width, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent);
         var box = NewTextBox(x, y, width, 34);
         var button = NewSmallButton(buttonText, x + width + 12, y - 2, 126, 38);
         button.Click += (_, _) =>
@@ -2733,7 +2732,7 @@ public sealed partial class MainForm : Form
 
     private static ThemedTextBox AddTextField(Control parent, string label, int x, int y, int width, string value, bool password = false, bool numeric = false)
     {
-        parent.Controls.Add(MakeLabel(label, x, y - 24, width, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        parent.Controls.Add(MakeLabel(label, x, y - 24, width, 22, 10.5F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent));
         var box = numeric ? NewNumberTextBox(x, y, width, 34) : NewTextBox(x, y, width, 34, password);
         box.Text = value;
         parent.Controls.Add(box);
@@ -2742,7 +2741,7 @@ public sealed partial class MainForm : Form
 
     private static ThemedTextBox AddCompactTextField(Control parent, string label, int x, int y, int width, string value, bool password = false, bool numeric = false)
     {
-        parent.Controls.Add(MakeLabel(label, x, y - 22, width, 20, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        parent.Controls.Add(MakeLabel(label, x, y - 22, width, 20, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent));
         var box = numeric ? NewNumberTextBox(x, y, width, 30) : NewTextBox(x, y, width, 30, password);
         box.Text = value;
         parent.Controls.Add(box);
@@ -2765,7 +2764,7 @@ public sealed partial class MainForm : Form
             OffColor2 = Color.FromArgb(122, 32, 42)
         };
         parent.Controls.Add(toggle);
-        parent.Controls.Add(MakeLabel(label, x + 68, y, 160, 28, 10.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        parent.Controls.Add(MakeLabel(label, x + 68, y, 160, 28, 10.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent));
         return toggle;
     }
 
@@ -5104,10 +5103,10 @@ public sealed partial class MainForm : Form
         panel.HighlightColor = Color.FromArgb(26, 255, 255, 255);
         const int textLeft = 22;
         const int valueLeft = 20;
-        panel.Controls.Add(MakeLabel(title, textLeft, 12, w - 44, 20, 10.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, panel.FillColor));
-        var valueLabel = MakeLabel(value, valueLeft, 30, w - 42, 30, 16, FontStyle.Bold, valueColor, ContentAlignment.MiddleLeft, panel.FillColor);
+        panel.Controls.Add(MakeLabel(title, textLeft, 12, w - 44, 20, 10.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent));
+        var valueLabel = MakeLabel(value, valueLeft, 30, w - 42, 30, 16, FontStyle.Bold, valueColor, ContentAlignment.MiddleLeft, Color.Transparent);
         panel.Controls.Add(valueLabel);
-        panel.Controls.Add(MakeLabel(sub, textLeft, 60, w - 44, 18, 8.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, panel.FillColor));
+        panel.Controls.Add(MakeLabel(sub, textLeft, 60, w - 44, 18, 8.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent));
         panel.Tag = valueLabel;
         return panel;
     }

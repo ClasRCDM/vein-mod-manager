@@ -6,7 +6,17 @@ namespace VEIN_Item_And_Container_Modifier;
 
 public class RoundedPanel : Panel
 {
-    public int Radius { get; set; } = 14;
+    private int _radius = 14;
+    public int Radius
+    {
+        get => _radius;
+        set
+        {
+            _radius = Math.Max(0, value);
+            UpdateRoundedRegion();
+            Invalidate();
+        }
+    }
     public Color FillColor { get; set; } = Color.FromArgb(10, 18, 30);
     public Color BorderColor { get; set; } = Color.FromArgb(32, 53, 82);
     public Color GradientTopColor { get; set; } = Color.Empty;
@@ -21,6 +31,21 @@ public class RoundedPanel : Panel
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
     }
 
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        UpdateRoundedRegion();
+    }
+
+    private void UpdateRoundedRegion()
+    {
+        if (Width <= 0 || Height <= 0) return;
+        using var path = RoundedRect(new Rectangle(0, 0, Width, Height), Radius);
+        var previousRegion = Region;
+        Region = new Region(path);
+        previousRegion?.Dispose();
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         PaintRoundedSurface(e.Graphics, dashed: false);
@@ -30,7 +55,7 @@ public class RoundedPanel : Panel
     {
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        graphics.Clear(VisualBackColor(Parent, BackColor));
+        PaintParentBackground(graphics);
         if (Width <= 2 || Height <= 2) return;
 
         var rect = new Rectangle(1, 1, Width - 3, Height - 3);
@@ -78,6 +103,22 @@ public class RoundedPanel : Panel
             pen.DashPattern = new[] { 6f, 6f };
         }
         graphics.DrawPath(pen, path);
+    }
+
+    private void PaintParentBackground(Graphics graphics)
+    {
+        if (Parent == null)
+        {
+            graphics.Clear(BackColor);
+            return;
+        }
+
+        var state = graphics.Save();
+        graphics.TranslateTransform(-Left, -Top);
+        using var parentArgs = new PaintEventArgs(graphics, new Rectangle(Left, Top, Width, Height));
+        InvokePaintBackground(Parent, parentArgs);
+        InvokePaint(Parent, parentArgs);
+        graphics.Restore(state);
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
@@ -193,14 +234,14 @@ public sealed class VeinLogoPanel : Control
 
     public VeinLogoPanel()
     {
-        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        e.Graphics.Clear(BackColor);
 
         using var glowPath = new GraphicsPath();
         glowPath.AddEllipse(4, 24, Math.Max(1, Width - 8), 76);
@@ -224,6 +265,22 @@ public sealed class VeinLogoPanel : Control
         e.Graphics.DrawString("VEIN", veinFont, mainBrush, veinRect, format);
         e.Graphics.DrawString("MOD MANAGER", subFont, subBrush, new RectangleF(0, 88, Width, 30), format);
     }
+    protected override void OnPaintBackground(PaintEventArgs pevent)
+    {
+        if (Parent == null || BackColor != Color.Transparent)
+        {
+            pevent.Graphics.Clear(RoundedPanel.VisualBackColor(Parent, BackColor));
+            return;
+        }
+
+        var state = pevent.Graphics.Save();
+        pevent.Graphics.TranslateTransform(-Left, -Top);
+        using var parentArgs = new PaintEventArgs(pevent.Graphics, new Rectangle(Left, Top, Width, Height));
+        InvokePaintBackground(Parent, parentArgs);
+        InvokePaint(Parent, parentArgs);
+        pevent.Graphics.Restore(state);
+    }
+
 }
 
 public enum ScriptIconKind
@@ -493,7 +550,7 @@ public sealed class RoundedButton : Button
         var graphics = pevent.Graphics;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        graphics.Clear(RoundedPanel.VisualBackColor(Parent, BackColor));
+        PaintParentBackground(graphics);
 
         var rect = new Rectangle(1, 1, Width - 3, Height - 3);
         var currentFill = !Enabled
@@ -554,6 +611,22 @@ public sealed class RoundedButton : Button
             textBounds,
             textColor,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+    }
+
+    private void PaintParentBackground(Graphics graphics)
+    {
+        if (Parent == null)
+        {
+            graphics.Clear(BackColor);
+            return;
+        }
+
+        var state = graphics.Save();
+        graphics.TranslateTransform(-Left, -Top);
+        using var parentArgs = new PaintEventArgs(graphics, new Rectangle(Left, Top, Width, Height));
+        InvokePaintBackground(Parent, parentArgs);
+        InvokePaint(Parent, parentArgs);
+        graphics.Restore(state);
     }
 
     protected override void OnPaintBackground(PaintEventArgs pevent)
@@ -1556,7 +1629,7 @@ public sealed class ToggleSwitch : Control
     {
         var graphics = e.Graphics;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        graphics.Clear(BackColor);
+        PaintParentBackground(graphics);
 
         var track = new Rectangle(1, 3, Width - 3, Height - 7);
         var borderColor = Checked
@@ -1592,6 +1665,22 @@ public sealed class ToggleSwitch : Control
         var glintBounds = new Rectangle(knobX + 5, knobY + 4, Math.Max(4, knob / 3), Math.Max(3, knob / 4));
         using var glint = new SolidBrush(Color.FromArgb(135, Color.White));
         graphics.FillEllipse(glint, glintBounds);
+    }
+
+    private void PaintParentBackground(Graphics graphics)
+    {
+        if (Parent == null)
+        {
+            graphics.Clear(BackColor);
+            return;
+        }
+
+        var state = graphics.Save();
+        graphics.TranslateTransform(-Left, -Top);
+        using var parentArgs = new PaintEventArgs(graphics, new Rectangle(Left, Top, Width, Height));
+        InvokePaintBackground(Parent, parentArgs);
+        InvokePaint(Parent, parentArgs);
+        graphics.Restore(state);
     }
 
     protected override void OnPaintBackground(PaintEventArgs pevent)
