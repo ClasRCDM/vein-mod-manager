@@ -78,6 +78,13 @@ public sealed partial class MainForm : Form
     private readonly ToolTip _toolTip = new();
     private ToggleSwitch _toolTipsToggle = null!;
     private Label _toolTipsStatus = null!;
+    private readonly System.Windows.Forms.Timer _toastTimer = new() { Interval = 2600 };
+    private readonly Dictionary<string, Label> _setupChecklistValues = new(StringComparer.Ordinal);
+    private readonly List<string> _recentGameFolders = new();
+    private readonly List<string> _recentModFolders = new();
+    private RoundedPanel? _toastPanel;
+    private Label? _toastLabel;
+    private Label? _recentPathsLabel;
     private RoundedPanel _importDropZone = null!;
     private Label _importConfigPathLabel = null!;
     private RoundedPanel _sidebar = null!;
@@ -189,10 +196,11 @@ public sealed partial class MainForm : Form
         ConfigureToolTips();
         if (LoadWindowIcon() is { } windowIcon) Icon = windowIcon;
         BuildUi();
+        _toastTimer.Tick += (_, _) => HideToast();
+        LoadRecentPaths();
 
         AutoDetectPaths(log: true);
         LoadModFromPath();
-
         _statusTimer.Tick += (_, _) => UpdateStatuses();
         _statusTimer.Start();
         UpdateStatuses();
@@ -291,6 +299,7 @@ public sealed partial class MainForm : Form
         BuildServerTopStatusCards();
         BuildTabs();
         ApplyResponsiveLayout();
+        BuildToast();
     }
 
     private void ApplyResponsiveLayout()
@@ -329,6 +338,7 @@ public sealed partial class MainForm : Form
         {
             _headerSubtitle.Width = Math.Max(360, ClientSize.Width - ContentLeft - 190);
         }
+        LayoutToast();
 
         if (_contentShell != null)
         {
@@ -1398,6 +1408,13 @@ public sealed partial class MainForm : Form
 
         AddPageHero(panel, "Automation", "Scripts", "Community automation for your server — scheduled tasks, webhooks and custom hooks.", 0, 20, 840, BrandPurpleLight);
 
+        var openScripts = MakeButton("Open Folder", panel.Width - 292, 34, 118, 38, OpenScriptsFolder);
+        openScripts.FillColor = SurfaceInset;
+        openScripts.HoverColor = Color.FromArgb(32, 43, 70);
+        openScripts.BorderColor = Color.FromArgb(52, 62, 104);
+        openScripts.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        panel.Controls.Add(openScripts);
+
         var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
         newScript.FillColor = BrandPurple;
         newScript.HoverColor = Color.FromArgb(147, 82, 255);
@@ -1407,7 +1424,6 @@ public sealed partial class MainForm : Form
         newScript.Radius = RadiusMd;
         newScript.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
         panel.Controls.Add(newScript);
-
         var filterBar = NewPanel(RadiusMd, 0, 128, 1213, 66);
         filterBar.FillColor = SurfaceRaised;
         filterBar.GradientTopColor = Color.FromArgb(16, 24, 46);
@@ -1418,10 +1434,10 @@ public sealed partial class MainForm : Form
         var selectedFilter = "All Scripts";
         Action<string>? applyScriptFilter = null;
         var filterControls = new Dictionary<string, (Control? Icon, Label Label, RoundedPanel Underline)>();
-        filterControls["All Scripts"] = AddScriptFilterTab(filterBar, "All Scripts", string.Empty, 28, selected: true, () => applyScriptFilter?.Invoke("All Scripts"));
-        filterControls["Scheduled"] = AddScriptFilterTab(filterBar, "Scheduled", "\uE916", 166, selected: false, () => applyScriptFilter?.Invoke("Scheduled"));
-        filterControls["Webhooks"] = AddScriptFilterTab(filterBar, "Webhooks", "\uE71B", 328, selected: false, () => applyScriptFilter?.Invoke("Webhooks"));
-        filterControls["Custom"] = AddScriptFilterTab(filterBar, "Custom", "</>", 496, selected: false, () => applyScriptFilter?.Invoke("Custom"));
+        filterControls["All Scripts"] = AddScriptFilterTab(filterBar, "All Scripts (4)", string.Empty, 28, selected: true, () => applyScriptFilter?.Invoke("All Scripts"));
+        filterControls["Scheduled"] = AddScriptFilterTab(filterBar, "Scheduled (2)", "\uE916", 186, selected: false, () => applyScriptFilter?.Invoke("Scheduled"));
+        filterControls["Webhooks"] = AddScriptFilterTab(filterBar, "Webhooks (1)", "\uE71B", 370, selected: false, () => applyScriptFilter?.Invoke("Webhooks"));
+        filterControls["Custom"] = AddScriptFilterTab(filterBar, "Custom (1)", "</>", 552, selected: false, () => applyScriptFilter?.Invoke("Custom"));
 
         var scheduledCard = BuildScriptCard(
             "Scheduled Restart",
@@ -1501,18 +1517,18 @@ public sealed partial class MainForm : Form
                     iconLabel.ForeColor = active ? TextMain : TextDim;
                 }
             }
-            LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
+            LayoutScriptsPage(panel, newScript, openScripts, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
             Log("Scripts filter: " + filter + ".");
         }
         applyScriptFilter = ApplyScriptFilter;
 
-        panel.Resize += (_, _) => LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
-        LayoutScriptsPage(panel, newScript, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
+        panel.Resize += (_, _) => LayoutScriptsPage(panel, newScript, openScripts, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
+        LayoutScriptsPage(panel, newScript, openScripts, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
 
         return panel;
     }
 
-    private static void LayoutScriptsPage(Control panel, Control newScript, Control filterBar, Control scheduledCard, Control webhookCard, Control backupCard, Control customZone, Control notice, string filter)
+    private static void LayoutScriptsPage(Control panel, Control newScript, Control openScripts, Control filterBar, Control scheduledCard, Control webhookCard, Control backupCard, Control customZone, Control notice, string filter)
     {
         var pageWidth = Math.Max(1000, panel.ClientSize.Width);
         const int margin = 18;
@@ -1525,6 +1541,10 @@ public sealed partial class MainForm : Form
         newScript.Top = 28;
         newScript.Width = 158;
         newScript.Height = 50;
+        openScripts.Left = pageWidth - 292;
+        openScripts.Top = 34;
+        openScripts.Width = 118;
+        openScripts.Height = 38;
         filterBar.Left = 0;
         filterBar.Top = 128;
         filterBar.Width = pageWidth;
@@ -1561,10 +1581,10 @@ public sealed partial class MainForm : Form
     {
         var width = text switch
         {
-            "All Scripts" => 112,
-            "Scheduled" => 124,
-            "Webhooks" => 128,
-            _ => 104
+            _ when text.StartsWith("All Scripts", StringComparison.Ordinal) => 132,
+            _ when text.StartsWith("Scheduled", StringComparison.Ordinal) => 142,
+            _ when text.StartsWith("Webhooks", StringComparison.Ordinal) => 146,
+            _ => 118
         };
         var textLeft = string.IsNullOrEmpty(icon) ? x : x + 26;
         Control? iconControl = null;
@@ -1692,6 +1712,7 @@ public sealed partial class MainForm : Form
         var divider = Line(28, h - 62, w - 56);
         var statusDot = MakeLabel("\u25CF", 28, h - 43, 16, 24, 10F, FontStyle.Regular, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
         var statusLabel = MakeLabel(status == "Active" ? "Active" : "Paused", 46, h - 42, 100, 24, 10F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
+        var duplicateLabel = MakeActionLabel("Duplicate", w - 236, h - 42, 76, 24, TextMuted, () => DuplicateScriptDraft(title, subtitle));
         var editLabel = MakeActionLabel("Edit", w - 148, h - 42, 44, 24, Color.FromArgb(167, 139, 250), () => ShowScriptEditorDialog(title, subtitle, description, enabled));
         var runLabel = MakeActionLabel("Run now", w - 96, h - 42, 80, 24, TextMuted, () => ShowScriptRunDialog(title, subtitle, description));
 
@@ -1731,7 +1752,7 @@ public sealed partial class MainForm : Form
             control.MouseLeave += CardMouseLeave;
         }
 
-        foreach (var control in new Control[] { card, iconBox, iconPanel, titleLabel, subtitleLabel, descriptionLabel, statusDot, statusLabel, editLabel, runLabel })
+        foreach (var control in new Control[] { card, iconBox, iconPanel, titleLabel, subtitleLabel, descriptionLabel, statusDot, statusLabel, duplicateLabel, editLabel, runLabel })
         {
             WireCardHover(control);
         }
@@ -1744,6 +1765,7 @@ public sealed partial class MainForm : Form
         card.Controls.Add(divider);
         card.Controls.Add(statusDot);
         card.Controls.Add(statusLabel);
+        card.Controls.Add(duplicateLabel);
         card.Controls.Add(editLabel);
         card.Controls.Add(runLabel);
 
@@ -1760,6 +1782,7 @@ public sealed partial class MainForm : Form
             divider.SetBounds(28, cardHeight - 62, Math.Max(0, cardWidth - 56), 1);
             statusDot.SetBounds(28, cardHeight - 43, 16, 24);
             statusLabel.SetBounds(46, cardHeight - 42, 100, 24);
+            duplicateLabel.SetBounds(cardWidth - 236, cardHeight - 42, 76, 24);
             editLabel.SetBounds(cardWidth - 148, cardHeight - 42, 44, 24);
             runLabel.SetBounds(cardWidth - 96, cardHeight - 42, 80, 24);
         }
@@ -1913,6 +1936,7 @@ public sealed partial class MainForm : Form
     {
         var panel = NewContentPanel();
         AddPageHero(panel, "Paths", "Setup", "Select your VEIN install and UE4SS mod folder. The editor writes generated overrides only.", 28, 22, 720);
+        panel.Height = 690;
         var readme = MakeButton("Readme", 834, 28, 126, 44, ShowReadmePopup);
         AddTip(readme, "Open the quick setup steps without leaving the manager.");
         panel.Controls.Add(readme);
@@ -1950,6 +1974,31 @@ public sealed partial class MainForm : Form
         panel.Controls.Add(saveConfig);
         panel.Controls.Add(backupNow);
         panel.Controls.Add(launchVein);
+
+        var checklist = NewPanel(RadiusMd, 30, 466, 456, 184);
+        checklist.BackColor = PanelBack;
+        checklist.Controls.Add(MakeLabel("Setup checklist", 22, 16, 220, 28, 14F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent));
+        AddSetupChecklistRow(checklist, "GameFolder", "Game folder", 52);
+        AddSetupChecklistRow(checklist, "Ue4ss", "UE4SS", 82);
+        AddSetupChecklistRow(checklist, "ModFolder", "Mod folder", 112);
+        AddSetupChecklistRow(checklist, "UiConfig", "ui_config.lua", 142);
+        panel.Controls.Add(checklist);
+
+        var quickFolders = NewPanel(RadiusMd, 506, 466, 454, 184);
+        quickFolders.BackColor = PanelBack;
+        quickFolders.Controls.Add(MakeLabel("Quick folders", 22, 16, 220, 28, 14F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent));
+        quickFolders.Controls.Add(MakeButton("Game", 22, 50, 124, 36, OpenGameFolder));
+        quickFolders.Controls.Add(MakeButton("Mod", 164, 50, 124, 36, OpenModFolder));
+        quickFolders.Controls.Add(MakeButton("Scripts", 306, 50, 124, 36, OpenScriptsFolder));
+        quickFolders.Controls.Add(MakeButton("Backups", 22, 94, 124, 36, OpenBackupFolder));
+        quickFolders.Controls.Add(MakeButton("Server Logs", 164, 94, 124, 36, OpenWindowsLogsFolder));
+        quickFolders.Controls.Add(MakeButton("Safe Backup", 306, 94, 124, 36, OpenSafeBackupFolder));
+        _recentPathsLabel = MakeWrappedLabel("Recent paths will appear after browsing or auto-detect.", 22, 140, 408, 34, 9F, FontStyle.Regular, TextDim, Color.Transparent);
+        quickFolders.Controls.Add(_recentPathsLabel);
+        panel.Controls.Add(quickFolders);
+
+        RefreshSetupChecklist();
+        UpdateRecentPathsLabel();
 
         return panel;
     }
@@ -2276,7 +2325,7 @@ public sealed partial class MainForm : Form
         var page = new Panel { BackColor = PanelBack };
         _serverManagementPane = page;
 
-        var windows = NewServerSection("Windows Server Management", 0, 0, 456, 200);
+        var windows = NewServerSection("Windows Server Management", 0, 0, 456, 260);
         _windowsServerActionsPanel = windows;
         page.Controls.Add(windows);
         windows.Controls.Add(MakeButton("Save Server Config", 22, 46, 180, 42, SaveWindowsServerConfig, main: true));
@@ -2286,6 +2335,10 @@ public sealed partial class MainForm : Form
         windows.Controls.Add(MakeButton("Restart Server", 286, 106, 122, 42, RestartWindowsServerFromUi));
         windows.Controls.Add(MakeButton("Open Server Folder", 22, 154, 180, 36, OpenSelectedServerFolder));
         windows.Controls.Add(MakeButton("View Logs", 222, 154, 160, 36, OpenSelectedServerLogs));
+        windows.Controls.Add(MakeButton("Validate", 22, 206, 96, 36, ValidateWindowsPortsFromUi));
+        windows.Controls.Add(MakeButton("Local Test", 130, 206, 96, 36, () => ApplyWindowsServerPreset("Local Test")));
+        windows.Controls.Add(MakeButton("Small", 238, 206, 78, 36, () => ApplyWindowsServerPreset("Small Server")));
+        windows.Controls.Add(MakeButton("Public", 328, 206, 80, 36, () => ApplyWindowsServerPreset("Public Server")));
 
         var linux = NewServerSection("Linux Server Management", 476, 0, 456, 260);
         _linuxServerActionsPanel = linux;
@@ -3770,8 +3823,10 @@ public sealed partial class MainForm : Form
     private RoundedPanel BuildLogTab()
     {
         var panel = NewContentPanel();
-        AddPageHero(panel, "Activity", "Status Log", "Copy friendly status messages, backup paths, safe-restart events, and errors from here.");
-
+        AddPageHero(panel, "Activity", "Status Log", "Copy friendly status messages, backup paths, safe-restart events, and errors from here.", 28, 22, 540);
+        panel.Controls.Add(MakeButton("Copy Log", 620, 32, 118, 38, CopyAppLog));
+        panel.Controls.Add(MakeButton("Save Log", 752, 32, 118, 38, SaveAppLog, main: true));
+        panel.Controls.Add(MakeButton("Clear Log", 884, 32, 106, 38, ClearAppLog));
         var logShell = NewPanel(RadiusMd, 30, 116, 930, 330);
         logShell.BackColor = PanelBack;
         logShell.FillColor = SurfaceInset;
@@ -3800,6 +3855,46 @@ public sealed partial class MainForm : Form
         return panel;
     }
 
+    private void CopyAppLog()
+    {
+        if (_log == null || string.IsNullOrWhiteSpace(_log.Text))
+        {
+            LogError("Log is empty.");
+            return;
+        }
+
+        Clipboard.SetText(_log.Text);
+        Log("Log copied to clipboard.");
+    }
+
+    private void SaveAppLog()
+    {
+        if (_log == null || string.IsNullOrWhiteSpace(_log.Text))
+        {
+            LogError("Log is empty.");
+            return;
+        }
+
+        using var dialog = new SaveFileDialog
+        {
+            Title = "Save VEIN Mod Manager log",
+            FileName = "vein-mod-manager-log-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".txt",
+            Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            OverwritePrompt = true
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        File.WriteAllText(dialog.FileName, _log.Text);
+        Log("Log saved: " + dialog.FileName);
+    }
+
+    private void ClearAppLog()
+    {
+        _log.Clear();
+        Log("Log cleared.");
+    }
+
     private void AutoDetectPaths(bool log)
     {
         var gameFolder = LuaModService.DetectGameFolder();
@@ -3808,6 +3903,8 @@ public sealed partial class MainForm : Form
             _gameFolderBox.Text = gameFolder;
             var modFolder = LuaModService.DetectModFolder(gameFolder) ?? LuaModService.GetExpectedModFolder(gameFolder);
             _modFolderBox.Text = modFolder;
+            AddRecentPath(_recentGameFolders, gameFolder);
+            AddRecentPath(_recentModFolders, modFolder);
 
             TryInstallBundledMod(gameFolder, modFolder, log);
 
@@ -3830,6 +3927,8 @@ public sealed partial class MainForm : Form
         _gameFolderBox.Text = dlg.SelectedPath;
         var expected = LuaModService.DetectModFolder(dlg.SelectedPath) ?? LuaModService.GetExpectedModFolder(dlg.SelectedPath);
         _modFolderBox.Text = expected;
+        AddRecentPath(_recentGameFolders, dlg.SelectedPath);
+        AddRecentPath(_recentModFolders, expected);
         TryInstallBundledMod(dlg.SelectedPath, expected, log: true);
         LoadModFromPath(loadExistingState: true);
         MarkUnsaved(false);
@@ -3863,6 +3962,7 @@ public sealed partial class MainForm : Form
         using var dlg = new FolderBrowserDialog { Description = "Select ItemAndContainerModifier folder" };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
         _modFolderBox.Text = dlg.SelectedPath;
+        AddRecentPath(_recentModFolders, dlg.SelectedPath);
         LoadModFromPath(loadExistingState: true);
         Log("Selected mod folder: " + dlg.SelectedPath);
     }
@@ -3879,6 +3979,51 @@ public sealed partial class MainForm : Form
         {
             LogError("Mod folder does not exist.");
         }
+    }
+
+    private void OpenGameFolder()
+    {
+        OpenDirectoryPath(_gameFolderBox.Text.Trim(), "Game folder");
+    }
+
+    private void OpenScriptsFolder()
+    {
+        OpenDirectoryPath(Path.Combine(_modFolderBox.Text.Trim(), "Scripts"), "Scripts folder");
+    }
+
+    private void OpenBackupFolder()
+    {
+        OpenDirectoryPath(Path.Combine(_modFolderBox.Text.Trim(), "Backups"), "Backups folder");
+    }
+
+    private void OpenWindowsLogsFolder()
+    {
+        var serverFolder = _windowsServerFolderBox?.Text.Trim() ?? string.Empty;
+        OpenDirectoryPath(Path.Combine(serverFolder, "Vein", "Saved", "Logs"), "Server logs folder");
+    }
+
+    private void OpenSafeBackupFolder()
+    {
+        var backupFolder = _windowsBackupDirectoryBox?.Text.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(backupFolder) && !string.IsNullOrWhiteSpace(_windowsServerFolderBox?.Text))
+        {
+            backupFolder = RestartSafetyService.CreateDefaultWindowsSettings(_windowsServerFolderBox.Text.Trim()).BackupDirectory;
+        }
+
+        OpenDirectoryPath(backupFolder, "Safe backup folder");
+    }
+
+    private bool OpenDirectoryPath(string path, string label)
+    {
+        if (Directory.Exists(path))
+        {
+            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            Log("Opened " + label + ".");
+            return true;
+        }
+
+        LogError(label + " does not exist.");
+        return false;
     }
 
     private bool ImportConfigFile(string path, bool markUnsaved)
@@ -4446,6 +4591,84 @@ public sealed partial class MainForm : Form
         UpdateStatuses();
     }
 
+
+    private void ValidateWindowsPortsFromUi()
+    {
+        try
+        {
+            var ports = new List<(string Name, int Port)>
+            {
+                ("Game", ReadPort(_windowsGamePortBox.Text, "Game port")),
+                ("Query", ReadPort(_windowsQueryPortBox.Text, "Query port"))
+            };
+
+            if (_windowsEnableRconToggle.Checked)
+            {
+                ports.Add(("RCON", ReadPort(_windowsRconPortBox.Text, "RCON port")));
+            }
+
+            if (_windowsEnableHttpApiToggle.Checked)
+            {
+                ports.Add(("HTTP API", ReadPort(_windowsHttpApiPortBox.Text, "HTTP API port")));
+            }
+
+            var duplicate = ports
+                .GroupBy(port => port.Port)
+                .FirstOrDefault(group => group.Count() > 1);
+
+            if (duplicate != null)
+            {
+                throw new InvalidOperationException("Duplicate port " + duplicate.Key + ": " + string.Join(", ", duplicate.Select(port => port.Name)) + ".");
+            }
+
+            SetConfigStatus("Ports OK", Green);
+            LogServer("Windows ports valid: " + string.Join(", ", ports.Select(port => port.Name + " " + port.Port.ToString(CultureInfo.InvariantCulture))) + ".");
+        }
+        catch (Exception ex)
+        {
+            SetServerManagerError("Port validation failed: " + ex.Message);
+        }
+    }
+
+    private void ApplyWindowsServerPreset(string preset)
+    {
+        switch (preset)
+        {
+            case "Local Test":
+                _windowsServerNameBox.Text = "VEIN Local Test";
+                _windowsMaxPlayersBox.Text = "4";
+                _windowsGamePortBox.Text = "7779";
+                _windowsQueryPortBox.Text = "27015";
+                _windowsEnableRconToggle.Checked = false;
+                _windowsRconPortBox.Text = "27020";
+                _windowsEnableHttpApiToggle.Checked = false;
+                _windowsHttpApiPortBox.Text = "8080";
+                break;
+            case "Small Server":
+                _windowsServerNameBox.Text = "VEIN Small Server";
+                _windowsMaxPlayersBox.Text = "16";
+                _windowsGamePortBox.Text = "7779";
+                _windowsQueryPortBox.Text = "27015";
+                _windowsEnableRconToggle.Checked = true;
+                _windowsRconPortBox.Text = "27020";
+                _windowsEnableHttpApiToggle.Checked = false;
+                _windowsHttpApiPortBox.Text = "8080";
+                break;
+            default:
+                _windowsServerNameBox.Text = "VEIN Public Server";
+                _windowsMaxPlayersBox.Text = "32";
+                _windowsGamePortBox.Text = "7777";
+                _windowsQueryPortBox.Text = "27016";
+                _windowsEnableRconToggle.Checked = true;
+                _windowsRconPortBox.Text = "27020";
+                _windowsEnableHttpApiToggle.Checked = true;
+                _windowsHttpApiPortBox.Text = "8080";
+                break;
+        }
+
+        SetConfigStatus("Preset Ready", Cyan);
+        LogServer("Applied Windows server preset: " + preset + ".");
+    }
     private void UpdateStatuses()
     {
         var gameRunning = Process.GetProcessesByName("Vein-Win64-Test").Length > 0
@@ -4461,6 +4684,7 @@ public sealed partial class MainForm : Form
         var modFound = LuaModService.IsValidModFolder(_modFolderBox.Text.Trim());
         _modStatus.Text = modFound ? "Found" : "Missing";
         _modStatus.ForeColor = modFound ? Green : Orange;
+        RefreshSetupChecklist();
         RefreshDashboard();
     }
 
@@ -4768,6 +4992,7 @@ public sealed partial class MainForm : Form
         _log.SelectionColor = _log.ForeColor;
         _log.ScrollToCaret();
         TrackRecentActivity(line.TrimEnd());
+        ShowToast(msg, color);
     }
 
     private void TrackRecentActivity(string line)
@@ -4779,6 +5004,165 @@ public sealed partial class MainForm : Form
         }
 
         RefreshDashboard();
+    }
+
+    private void BuildToast()
+    {
+        _toastPanel = NewPanel(RadiusMd, 0, 0, 380, 54);
+        _toastPanel.FillColor = Color.FromArgb(16, 24, 44);
+        _toastPanel.GradientTopColor = Color.FromArgb(24, 34, 62);
+        _toastPanel.GradientBottomColor = Color.FromArgb(12, 18, 34);
+        _toastPanel.BorderColor = Color.FromArgb(56, 68, 112);
+        _toastPanel.BackColor = AppBack;
+        _toastPanel.Visible = false;
+        _toastLabel = MakeLabel("", 18, 12, 344, 30, 10.5F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent);
+        _toastPanel.Controls.Add(_toastLabel);
+        Controls.Add(_toastPanel);
+        LayoutToast();
+    }
+
+    private void LayoutToast()
+    {
+        if (_toastPanel == null) return;
+
+        _toastPanel.Left = Math.Max(ContentLeft, ClientSize.Width - _toastPanel.Width - 34);
+        _toastPanel.Top = ClientSize.Height - _toastPanel.Height - 34;
+    }
+
+    private void ShowToast(string message, Color color)
+    {
+        if (_toastPanel == null || _toastLabel == null) return;
+
+        _toastLabel.Text = message;
+        _toastLabel.ForeColor = color == TextMuted ? TextMain : color;
+        _toastPanel.Visible = true;
+        _toastPanel.BringToFront();
+        _toastTimer.Stop();
+        _toastTimer.Start();
+    }
+
+    private void HideToast()
+    {
+        _toastTimer.Stop();
+        if (_toastPanel != null)
+        {
+            _toastPanel.Visible = false;
+        }
+    }
+
+    private void AddSetupChecklistRow(Control parent, string key, string label, int y)
+    {
+        parent.Controls.Add(MakeLabel(label, 22, y, 210, 22, 10.5F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, Color.Transparent));
+        var value = MakeLabel("Pending", 284, y, 140, 22, 10.5F, FontStyle.Bold, TextDim, ContentAlignment.MiddleRight, Color.Transparent);
+        _setupChecklistValues[key] = value;
+        parent.Controls.Add(value);
+    }
+
+    private void RefreshSetupChecklist()
+    {
+        if (_setupChecklistValues.Count == 0 || _gameFolderBox == null || _modFolderBox == null) return;
+
+        var gameFolder = _gameFolderBox.Text.Trim();
+        var modFolder = _modFolderBox.Text.Trim();
+        SetSetupChecklist("GameFolder", Directory.Exists(gameFolder), Directory.Exists(gameFolder) ? "OK" : "Missing");
+        SetSetupChecklist("Ue4ss", LuaModService.HasUe4ss(gameFolder), LuaModService.HasUe4ss(gameFolder) ? "Found" : "Missing");
+        SetSetupChecklist("ModFolder", LuaModService.IsValidModFolder(modFolder), LuaModService.IsValidModFolder(modFolder) ? "Valid" : "Missing");
+        var uiConfigPath = Path.Combine(modFolder, "Scripts", "ui_config.lua");
+        SetSetupChecklist("UiConfig", File.Exists(uiConfigPath), File.Exists(uiConfigPath) ? "Found" : "Not found");
+    }
+
+    private void SetSetupChecklist(string key, bool ok, string text)
+    {
+        if (!_setupChecklistValues.TryGetValue(key, out var label)) return;
+
+        label.Text = text;
+        label.ForeColor = ok ? Green : Orange;
+    }
+
+    private static string RecentPathsFilePath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vein Mod Manager", "recent-paths.txt");
+    }
+
+    private void LoadRecentPaths()
+    {
+        try
+        {
+            var path = RecentPathsFilePath();
+            if (!File.Exists(path))
+            {
+                UpdateRecentPathsLabel();
+                return;
+            }
+
+            foreach (var line in File.ReadAllLines(path))
+            {
+                if (line.Length < 3 || line[1] != '|') continue;
+
+                if (line[0] == 'G') AddRecentPath(_recentGameFolders, line[2..], save: false);
+                if (line[0] == 'M') AddRecentPath(_recentModFolders, line[2..], save: false);
+            }
+
+            UpdateRecentPathsLabel();
+        }
+        catch
+        {
+            UpdateRecentPathsLabel();
+        }
+    }
+
+    private void SaveRecentPaths()
+    {
+        try
+        {
+            var path = RecentPathsFilePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var lines = _recentGameFolders.Select(item => "G|" + item).Concat(_recentModFolders.Select(item => "M|" + item));
+            File.WriteAllLines(path, lines);
+        }
+        catch
+        {
+        }
+    }
+
+    private void AddRecentPath(List<string> list, string path, bool save = true)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        var normalized = path.Trim();
+        try
+        {
+            normalized = Path.GetFullPath(normalized);
+        }
+        catch
+        {
+        }
+
+        list.RemoveAll(item => item.Equals(normalized, StringComparison.OrdinalIgnoreCase));
+        list.Insert(0, normalized);
+        while (list.Count > 5)
+        {
+            list.RemoveAt(list.Count - 1);
+        }
+
+        if (save) SaveRecentPaths();
+        UpdateRecentPathsLabel();
+    }
+
+    private void UpdateRecentPathsLabel()
+    {
+        if (_recentPathsLabel == null) return;
+
+        var game = _recentGameFolders.Count == 0 ? "Game: none" : "Game: " + CompactPath(_recentGameFolders[0], 46);
+        var mod = _recentModFolders.Count == 0 ? "Mod: none" : "Mod: " + CompactPath(_recentModFolders[0], 46);
+        _recentPathsLabel.Text = game + Environment.NewLine + mod;
+    }
+
+    private static string CompactPath(string path, int maxLength)
+    {
+        if (path.Length <= maxLength) return path;
+
+        return "..." + path[^Math.Max(0, maxLength - 3)..];
     }
 
     private static RoundedPanel NewContentPanel()
@@ -4928,6 +5312,15 @@ public sealed partial class MainForm : Form
         }, main: true));
         shell.Controls.Add(MakeButton("Run Now", 450, 384, 100, 42, () => ShowScriptRunDialog(title, subtitle, description)));
         popup.ShowDialog(this);
+    }
+
+    private void DuplicateScriptDraft(string title, string subtitle)
+    {
+        var runtime = subtitle.Split('-', 2)[0].Trim();
+        if (CreateScriptDraft(title + " Copy", runtime))
+        {
+            Log("Duplicated script draft: " + title + ".");
+        }
     }
 
     private void ShowScriptRunDialog(string title, string subtitle, string description)
