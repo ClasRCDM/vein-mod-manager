@@ -25,6 +25,7 @@ internal static class SmokeTests
         ServerManager_GeneratesSafeProfilesConfigsAndHelperPackage();
         SafeRestart_VerifiesBacksUpDetectsAndRestores();
         ModParity_BuildsPackageAndInstallsWindowsServerMod();
+        ScriptManager_LoadsPersistsDuplicatesAndRuns();
         CreateBackup_ConsecutiveCallsUseUniqueFolders();
         ApplyConfig_ReplacesMalformedExistingUiConfig();
         LoadUiConfigStateFromFile_MalformedConfigThrowsInvalidDataException("local UiConfig = {}", "return UiConfig");
@@ -278,6 +279,69 @@ internal static class SmokeTests
             Directory.CreateDirectory(serverRoot);
             var installedParityPath = ModParityService.InstallWindowsServerMod(serverRoot, new[] { modFolder }, paritySettings, parityTemplateRoot);
             AssertFileContains(Path.Combine(installedParityPath, "Scripts", "expected_mods.lua"), "Smoke test modpack mismatch.", "installed server parity manifest");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(testRoot);
+        }
+    }
+
+    private static void ScriptManager_LoadsPersistsDuplicatesAndRuns()
+    {
+        var template = GetTemplateFolder();
+        var testRoot = CreateTempRoot();
+        var modFolder = Path.Combine(testRoot, "ItemAndContainerModifier");
+
+        try
+        {
+            CopyDirectory(template, modFolder);
+
+            var registry = ScriptManagerService.LoadOrCreate(modFolder);
+            AssertEqual(3, registry.Scripts.Count, "starter script count");
+            AssertFileExists(ScriptManagerService.GetRegistryPath(modFolder), "script registry");
+            AssertTrue(registry.Scripts.Any(script => script.Name.Equals("Scheduled Restart", StringComparison.Ordinal)), "scheduled restart starter");
+            AssertTrue(registry.Scripts.Any(script => script.Name.Equals("Discord Status Webhook", StringComparison.Ordinal)), "webhook starter");
+            AssertTrue(registry.Scripts.Any(script => script.Name.Equals("Nightly Backup", StringComparison.Ordinal)), "backup starter");
+
+            var custom = ScriptManagerService.CreateScript(modFolder, "Status Probe", "Batch", "Manual");
+            var customPath = ScriptManagerService.ResolveScriptPath(modFolder, custom);
+            AssertFileExists(customPath, "custom script file");
+            var editStartInfo = ScriptManagerService.CreateEditorStartInfo(customPath);
+            AssertEqual("notepad.exe", editStartInfo.FileName, "script editor executable");
+            AssertEqual(false, editStartInfo.UseShellExecute, "script editor shell execution");
+            AssertContains(editStartInfo.Arguments, customPath, "script editor target");
+            AssertThrowsContains<InvalidOperationException>(
+                () => ScriptManagerService.ResolveScriptPath(modFolder, new ManagedScriptEntry { RelativePath = @"..\outside.bat" }),
+                "Automation",
+                "script path traversal rejection");
+
+            var quotedLua = ScriptManagerService.CreateScript(modFolder, "Quote \"Probe\"", "Lua", "Manual \"Test\"");
+            AssertFileContains(ScriptManagerService.ResolveScriptPath(modFolder, quotedLua), "Quote \\\"Probe\\\"", "lua draft escaped name");
+            AssertFileContains(ScriptManagerService.ResolveScriptPath(modFolder, quotedLua), "Manual \\\"Test\\\"", "lua draft escaped trigger");
+            var quotedPowerShell = ScriptManagerService.CreateScript(modFolder, "Power \"Probe\"", "PowerShell", "Daily \"Test\"");
+            AssertFileContains(ScriptManagerService.ResolveScriptPath(modFolder, quotedPowerShell), "Power `\"Probe`\"", "powershell draft escaped name");
+            AssertFileContains(ScriptManagerService.ResolveScriptPath(modFolder, quotedPowerShell), "Daily `\"Test`\"", "powershell draft escaped trigger");
+
+            var duplicated = ScriptManagerService.DuplicateScript(modFolder, custom.Id);
+            AssertFileExists(ScriptManagerService.ResolveScriptPath(modFolder, duplicated), "duplicated script file");
+            AssertNotEqual(custom.Id, duplicated.Id, "duplicated script id");
+
+            var toggled = ScriptManagerService.SetEnabled(modFolder, custom.Id, false);
+            AssertEqual(false, toggled.Enabled, "script disabled state");
+
+            var batchRun = ScriptManagerService.RunScript(modFolder, custom.Id);
+            AssertEqual(true, batchRun.Executed, "batch script executed");
+            AssertEqual(0, batchRun.ExitCode, "batch script exit code");
+            AssertContains(batchRun.Output, "VEIN automation: Status Probe", "batch script output");
+
+            var luaScript = registry.Scripts.First(script => script.Runtime.Equals("Lua", StringComparison.Ordinal));
+            var luaRun = ScriptManagerService.RunScript(modFolder, luaScript.Id);
+            AssertEqual(true, luaRun.ManualOnly, "lua manual execution");
+
+            var externalPath = Path.Combine(ScriptManagerService.GetAutomationFolder(modFolder), "external-script.ps1");
+            File.WriteAllText(externalPath, "Write-Host \"External automation\"\r\n");
+            var synced = ScriptManagerService.LoadOrCreate(modFolder);
+            AssertTrue(synced.Scripts.Any(script => script.RelativePath.EndsWith("external-script.ps1", StringComparison.OrdinalIgnoreCase)), "external script sync");
         }
         finally
         {

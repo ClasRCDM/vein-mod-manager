@@ -85,6 +85,13 @@ public sealed partial class MainForm : Form
     private RoundedPanel? _toastPanel;
     private Label? _toastLabel;
     private Label? _recentPathsLabel;
+    private readonly Dictionary<string, (Control? Icon, Label Label, RoundedPanel Underline)> _scriptFilterControls = new(StringComparer.Ordinal);
+    private ManagedScriptRegistry _scriptRegistry = new();
+    private RoundedPanel? _scriptsPage;
+    private RoundedButton? _scriptsOpenFolderButton;
+    private RoundedButton? _scriptsNewScriptButton;
+    private RoundedPanel? _scriptsFilterBar;
+    private string _selectedScriptFilter = "All Scripts";
     private RoundedPanel _importDropZone = null!;
     private Label _importConfigPathLabel = null!;
     private RoundedPanel _sidebar = null!;
@@ -758,13 +765,19 @@ public sealed partial class MainForm : Form
         var logo = new VeinLogoPanel
         {
             Left = 28,
-            Top = 36,
+            Top = 24,
             Width = 164,
-            Height = 136,
+            Height = 150,
             BackColor = Color.Transparent,
             GlowColor = BrandRedHot,
             AccentColor = BrandRedHot,
-            MainColor = Color.White
+            MainColor = Color.White,
+            LogoImage = LoadLogoImage(),
+            Radius = RadiusMd,
+            ImageBleed = 16,
+            FrameColor = Color.FromArgb(8, 10, 18),
+            BorderColor = Color.FromArgb(92, 32, 48),
+            HighlightColor = Color.FromArgb(34, 255, 255, 255)
         };
         _sidebar.Controls.Add(logo);
         _sidebar.Controls.Add(Line(20, 190, SidebarWidth - 40));
@@ -1007,6 +1020,10 @@ public sealed partial class MainForm : Form
             }
 
             ApplyResponsiveLayout();
+            if (scriptsSelected)
+            {
+                RefreshScriptsView();
+            }
             if (dashboardSelected)
             {
                 RefreshDashboard();
@@ -1405,84 +1422,233 @@ public sealed partial class MainForm : Form
         var panel = NewPanel(0, 0, 0, 1213, 900);
         panel.BorderColor = AppBack;
         panel.FillColor = AppBack;
+        panel.AutoScroll = true;
+        panel.AutoScrollMargin = new Size(0, 18);
+        _scriptsPage = panel;
+        _scriptFilterControls.Clear();
 
         AddPageHero(panel, "Automation", "Scripts", "Community automation for your server — scheduled tasks, webhooks and custom hooks.", 0, 20, 840, BrandPurpleLight);
 
-        var openScripts = MakeButton("Open Folder", panel.Width - 292, 34, 118, 38, OpenScriptsFolder);
-        openScripts.FillColor = SurfaceInset;
-        openScripts.HoverColor = Color.FromArgb(32, 43, 70);
-        openScripts.BorderColor = Color.FromArgb(52, 62, 104);
-        openScripts.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        panel.Controls.Add(openScripts);
+        _scriptsOpenFolderButton = MakeButton("Open Folder", panel.Width - 292, 34, 118, 38, OpenManagedScriptsFolder);
+        _scriptsOpenFolderButton.FillColor = SurfaceInset;
+        _scriptsOpenFolderButton.HoverColor = Color.FromArgb(32, 43, 70);
+        _scriptsOpenFolderButton.BorderColor = Color.FromArgb(52, 62, 104);
+        _scriptsOpenFolderButton.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        panel.Controls.Add(_scriptsOpenFolderButton);
 
-        var newScript = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
-        newScript.FillColor = BrandPurple;
-        newScript.HoverColor = Color.FromArgb(147, 82, 255);
-        newScript.PressedColor = Color.FromArgb(97, 42, 190);
-        newScript.BorderColor = BrandPurpleLight;
-        newScript.FocusBorderColor = BrandPurpleLight;
-        newScript.Radius = RadiusMd;
-        newScript.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        panel.Controls.Add(newScript);
-        var filterBar = NewPanel(RadiusMd, 0, 128, 1213, 66);
-        filterBar.FillColor = SurfaceRaised;
-        filterBar.GradientTopColor = Color.FromArgb(16, 24, 46);
-        filterBar.GradientBottomColor = SurfaceRaised;
-        filterBar.BorderColor = Color.FromArgb(38, 46, 82);
-        filterBar.HighlightColor = Color.FromArgb(24, 255, 255, 255);
-        panel.Controls.Add(filterBar);
-        var selectedFilter = "All Scripts";
+        _scriptsNewScriptButton = MakeButton("+ New Script", panel.Width - 160, 28, 158, 50, ShowNewScriptDialog, main: true);
+        _scriptsNewScriptButton.FillColor = BrandPurple;
+        _scriptsNewScriptButton.HoverColor = Color.FromArgb(147, 82, 255);
+        _scriptsNewScriptButton.PressedColor = Color.FromArgb(97, 42, 190);
+        _scriptsNewScriptButton.BorderColor = BrandPurpleLight;
+        _scriptsNewScriptButton.FocusBorderColor = BrandPurpleLight;
+        _scriptsNewScriptButton.Radius = RadiusMd;
+        _scriptsNewScriptButton.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        panel.Controls.Add(_scriptsNewScriptButton);
+
+        _scriptsFilterBar = NewPanel(RadiusMd, 0, 128, 1213, 66);
+        _scriptsFilterBar.FillColor = SurfaceRaised;
+        _scriptsFilterBar.GradientTopColor = Color.FromArgb(16, 24, 46);
+        _scriptsFilterBar.GradientBottomColor = SurfaceRaised;
+        _scriptsFilterBar.BorderColor = Color.FromArgb(38, 46, 82);
+        _scriptsFilterBar.HighlightColor = Color.FromArgb(24, 255, 255, 255);
+        panel.Controls.Add(_scriptsFilterBar);
+
         Action<string>? applyScriptFilter = null;
-        var filterControls = new Dictionary<string, (Control? Icon, Label Label, RoundedPanel Underline)>();
-        filterControls["All Scripts"] = AddScriptFilterTab(filterBar, "All Scripts (4)", string.Empty, 28, selected: true, () => applyScriptFilter?.Invoke("All Scripts"));
-        filterControls["Scheduled"] = AddScriptFilterTab(filterBar, "Scheduled (2)", "\uE916", 186, selected: false, () => applyScriptFilter?.Invoke("Scheduled"));
-        filterControls["Webhooks"] = AddScriptFilterTab(filterBar, "Webhooks (1)", "\uE71B", 370, selected: false, () => applyScriptFilter?.Invoke("Webhooks"));
-        filterControls["Custom"] = AddScriptFilterTab(filterBar, "Custom (1)", "</>", 552, selected: false, () => applyScriptFilter?.Invoke("Custom"));
+        _scriptFilterControls["All Scripts"] = AddScriptFilterTab(_scriptsFilterBar, "All Scripts (0)", string.Empty, 28, selected: true, () => applyScriptFilter?.Invoke("All Scripts"));
+        _scriptFilterControls["Scheduled"] = AddScriptFilterTab(_scriptsFilterBar, "Scheduled (0)", "\uE916", 186, selected: false, () => applyScriptFilter?.Invoke("Scheduled"));
+        _scriptFilterControls["Webhooks"] = AddScriptFilterTab(_scriptsFilterBar, "Webhooks (0)", "\uE71B", 370, selected: false, () => applyScriptFilter?.Invoke("Webhooks"));
+        _scriptFilterControls["Custom"] = AddScriptFilterTab(_scriptsFilterBar, "Custom (0)", "</>", 552, selected: false, () => applyScriptFilter?.Invoke("Custom"));
 
-        var scheduledCard = BuildScriptCard(
-            "Scheduled Restart",
-            "Batch - Every 6 hours",
-            "Gracefully warns players, saves the world and restarts the server process on a fixed interval to clear memory.",
-            "Active",
-            ScriptIconKind.Clock,
-            enabled: true,
-            x: 18,
-            y: 220,
-            w: 574,
-            h: 255);
+        void ApplyScriptFilter(string filter)
+        {
+            _selectedScriptFilter = filter;
+            RefreshScriptsView();
+            Log("Scripts filter: " + filter + ".");
+        }
 
-        var webhookCard = BuildScriptCard(
-            "Discord Status Webhook",
-            "Lua - On player join/leave",
-            "Posts live player count, server status and join notifications to a configured Discord channel.",
-            "Active",
-            ScriptIconKind.Bell,
-            enabled: true,
-            x: 626,
-            y: 220,
-            w: 574,
-            h: 255);
+        applyScriptFilter = ApplyScriptFilter;
+        panel.Resize += (_, _) => RefreshScriptsView();
+        RefreshScriptsView();
+        return panel;
+    }
 
-        var backupCard = BuildScriptCard(
-            "Nightly Backup",
-            "PowerShell - Daily at 04:00",
-            "Zips the save folder and config files to a timestamped archive, keeping the last 14 days of backups.",
-            "Paused",
-            ScriptIconKind.Disk,
-            enabled: false,
-            x: 18,
-            y: 504,
-            w: 574,
-            h: 255);
+    private void RefreshScriptsView()
+    {
+        if (_scriptsPage == null || _scriptsFilterBar == null || _scriptsOpenFolderButton == null || _scriptsNewScriptButton == null) return;
 
-        var customZone = BuildCustomScriptDropZone(626, 504, 574, 255);
+        var panel = _scriptsPage;
+        var pageWidth = Math.Max(1000, panel.ClientSize.Width);
+        const int margin = 18;
+        const int gap = 26;
+        const int cardHeight = 255;
+        const int rowGap = 29;
+        var cardWidth = Math.Max(460, (pageWidth - margin * 2 - gap) / 2);
+        var rightX = margin + cardWidth + gap;
 
-        panel.Controls.Add(scheduledCard);
-        panel.Controls.Add(webhookCard);
-        panel.Controls.Add(backupCard);
-        panel.Controls.Add(customZone);
+        _scriptsNewScriptButton.Left = pageWidth - 160;
+        _scriptsNewScriptButton.Top = 28;
+        _scriptsOpenFolderButton.Left = pageWidth - 292;
+        _scriptsOpenFolderButton.Top = 34;
+        _scriptsFilterBar.Width = pageWidth;
 
-        var notice = NewPanel(RadiusMd, 0, 788, 1213, 72);
+        foreach (var control in panel.Controls.Cast<Control>().Where(control => Equals(control.Tag, "scripts-dynamic")).ToArray())
+        {
+            panel.Controls.Remove(control);
+            control.Dispose();
+        }
+
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
+        {
+            _scriptRegistry = new ManagedScriptRegistry();
+            UpdateScriptFilterCounts();
+            var emptyState = BuildScriptsEmptyState(margin, 220, pageWidth - margin * 2, 160, "Setup needed", "Select a valid ItemAndContainerModifier folder in Setup before managing automation scripts.", "Open Setup", () => ShowTab("Setup"));
+            emptyState.Tag = "scripts-dynamic";
+            panel.Controls.Add(emptyState);
+            var notice = BuildScriptsNotice(pageWidth, 404);
+            notice.Tag = "scripts-dynamic";
+            panel.Controls.Add(notice);
+            panel.AutoScrollMinSize = new Size(0, notice.Bottom + 24);
+            return;
+        }
+
+        try
+        {
+            _scriptRegistry = ScriptManagerService.LoadOrCreate(modFolder);
+        }
+        catch (Exception ex)
+        {
+            _scriptRegistry = new ManagedScriptRegistry();
+            UpdateScriptFilterCounts();
+            var errorState = BuildScriptsEmptyState(margin, 220, pageWidth - margin * 2, 160, "Scripts unavailable", ex.Message, "Open Setup", () => ShowTab("Setup"));
+            errorState.Tag = "scripts-dynamic";
+            panel.Controls.Add(errorState);
+            var notice = BuildScriptsNotice(pageWidth, 404);
+            notice.Tag = "scripts-dynamic";
+            panel.Controls.Add(notice);
+            panel.AutoScrollMinSize = new Size(0, notice.Bottom + 24);
+            return;
+        }
+
+        UpdateScriptFilterCounts();
+        var scripts = FilterScripts(_scriptRegistry.Scripts).ToList();
+        var cardIndex = 0;
+
+        foreach (var script in scripts)
+        {
+            var row = cardIndex / 2;
+            var column = cardIndex % 2;
+            var card = BuildScriptCard(script, column == 0 ? margin : rightX, 220 + row * (cardHeight + rowGap), cardWidth, cardHeight);
+            card.Tag = "scripts-dynamic";
+            panel.Controls.Add(card);
+            cardIndex++;
+        }
+
+        if (_selectedScriptFilter is "All Scripts" or "Custom")
+        {
+            var row = cardIndex / 2;
+            var column = cardIndex % 2;
+            var customZone = BuildCustomScriptDropZone(column == 0 ? margin : rightX, 220 + row * (cardHeight + rowGap), cardWidth, cardHeight);
+            customZone.Tag = "scripts-dynamic";
+            panel.Controls.Add(customZone);
+            cardIndex++;
+        }
+
+        if (cardIndex == 0)
+        {
+            var emptyState = BuildScriptsEmptyState(margin, 220, pageWidth - margin * 2, 160, "No scripts in this view", "Create a new automation script or change the filter to see other entries.", "New Script", ShowNewScriptDialog);
+            emptyState.Tag = "scripts-dynamic";
+            panel.Controls.Add(emptyState);
+            var notice = BuildScriptsNotice(pageWidth, 404);
+            notice.Tag = "scripts-dynamic";
+            panel.Controls.Add(notice);
+            panel.AutoScrollMinSize = new Size(0, notice.Bottom + 24);
+            return;
+        }
+
+        var lastRow = (cardIndex - 1) / 2;
+        var noticeTop = 220 + (lastRow + 1) * (cardHeight + rowGap);
+        var footerNotice = BuildScriptsNotice(pageWidth, noticeTop);
+        footerNotice.Tag = "scripts-dynamic";
+        panel.Controls.Add(footerNotice);
+        panel.AutoScrollMinSize = new Size(0, footerNotice.Bottom + 24);
+    }
+
+    private IEnumerable<ManagedScriptEntry> FilterScripts(IEnumerable<ManagedScriptEntry> scripts)
+    {
+        return _selectedScriptFilter switch
+        {
+            "Scheduled" => scripts.Where(script => ScriptFilterBucket(script).Equals("Scheduled", StringComparison.Ordinal)),
+            "Webhooks" => scripts.Where(script => ScriptFilterBucket(script).Equals("Webhooks", StringComparison.Ordinal)),
+            "Custom" => scripts.Where(script => ScriptFilterBucket(script).Equals("Custom", StringComparison.Ordinal)),
+            _ => scripts
+        };
+    }
+
+    private void UpdateScriptFilterCounts()
+    {
+        var scheduledCount = _scriptRegistry.Scripts.Count(script => ScriptFilterBucket(script).Equals("Scheduled", StringComparison.Ordinal));
+        var webhookCount = _scriptRegistry.Scripts.Count(script => ScriptFilterBucket(script).Equals("Webhooks", StringComparison.Ordinal));
+        var customCount = _scriptRegistry.Scripts.Count(script => ScriptFilterBucket(script).Equals("Custom", StringComparison.Ordinal));
+
+        if (_scriptFilterControls.TryGetValue("All Scripts", out var allControls))
+        {
+            allControls.Label.Text = "All Scripts (" + _scriptRegistry.Scripts.Count.ToString(CultureInfo.InvariantCulture) + ")";
+        }
+
+        if (_scriptFilterControls.TryGetValue("Scheduled", out var scheduledControls))
+        {
+            scheduledControls.Label.Text = "Scheduled (" + scheduledCount.ToString(CultureInfo.InvariantCulture) + ")";
+        }
+
+        if (_scriptFilterControls.TryGetValue("Webhooks", out var webhookControls))
+        {
+            webhookControls.Label.Text = "Webhooks (" + webhookCount.ToString(CultureInfo.InvariantCulture) + ")";
+        }
+
+        if (_scriptFilterControls.TryGetValue("Custom", out var customControls))
+        {
+            customControls.Label.Text = "Custom (" + customCount.ToString(CultureInfo.InvariantCulture) + ")";
+        }
+
+        foreach (var (name, controls) in _scriptFilterControls)
+        {
+            var active = name.Equals(_selectedScriptFilter, StringComparison.Ordinal);
+            controls.Label.ForeColor = active ? TextMain : TextDim;
+            controls.Underline.Visible = active;
+            if (controls.Icon is ScriptIconPanel scriptIcon)
+            {
+                scriptIcon.IconColor = active ? TextMain : TextDim;
+                scriptIcon.Invalidate();
+            }
+            else if (controls.Icon is Label iconLabel)
+            {
+                iconLabel.ForeColor = active ? TextMain : TextDim;
+            }
+        }
+    }
+
+    private static string ScriptFilterBucket(ManagedScriptEntry script)
+    {
+        if (script.Icon.Equals("Bell", StringComparison.OrdinalIgnoreCase)
+            || script.Name.Contains("webhook", StringComparison.OrdinalIgnoreCase)
+            || script.Trigger.Contains("join", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Webhooks";
+        }
+
+        if (script.Icon.Equals("Code", StringComparison.OrdinalIgnoreCase)
+            || script.Trigger.Equals("Manual", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Custom";
+        }
+
+        return "Scheduled";
+    }
+
+    private RoundedPanel BuildScriptsNotice(int pageWidth, int top)
+    {
+        var notice = NewPanel(RadiusMd, 0, top, pageWidth, 72);
         notice.FillColor = Color.FromArgb(15, 17, 42);
         notice.GradientTopColor = Color.FromArgb(18, 21, 52);
         notice.GradientBottomColor = Color.FromArgb(12, 15, 34);
@@ -1496,85 +1662,41 @@ public sealed partial class MainForm : Form
         };
         noticeIcon.SetBounds(28, 20, 28, 28);
         notice.Controls.Add(noticeIcon);
-        notice.Controls.Add(MakeLabel("Scripts run inside a sandbox with access to RCON and the server API. Review community scripts before enabling them on a live server.", 70, 22, 1100, 28, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, notice.FillColor));
-        panel.Controls.Add(notice);
-
-        void ApplyScriptFilter(string filter)
-        {
-            selectedFilter = filter;
-            foreach (var (name, controls) in filterControls)
-            {
-                var active = name.Equals(filter, StringComparison.Ordinal);
-                controls.Label.ForeColor = active ? TextMain : TextDim;
-                controls.Underline.Visible = active;
-                if (controls.Icon is ScriptIconPanel scriptIcon)
-                {
-                    scriptIcon.IconColor = active ? TextMain : TextDim;
-                    scriptIcon.Invalidate();
-                }
-                else if (controls.Icon is Label iconLabel)
-                {
-                    iconLabel.ForeColor = active ? TextMain : TextDim;
-                }
-            }
-            LayoutScriptsPage(panel, newScript, openScripts, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
-            Log("Scripts filter: " + filter + ".");
-        }
-        applyScriptFilter = ApplyScriptFilter;
-
-        panel.Resize += (_, _) => LayoutScriptsPage(panel, newScript, openScripts, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
-        LayoutScriptsPage(panel, newScript, openScripts, filterBar, scheduledCard, webhookCard, backupCard, customZone, notice, selectedFilter);
-
-        return panel;
+        notice.Controls.Add(MakeLabel("Batch and PowerShell scripts run directly on this PC. Review every script before running it on a live server.", 70, 22, Math.Max(300, pageWidth - 100), 28, 11F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent));
+        return notice;
     }
 
-    private static void LayoutScriptsPage(Control panel, Control newScript, Control openScripts, Control filterBar, Control scheduledCard, Control webhookCard, Control backupCard, Control customZone, Control notice, string filter)
+    private RoundedPanel BuildScriptsEmptyState(int x, int y, int width, int height, string title, string message, string buttonText, Action action)
     {
-        var pageWidth = Math.Max(1000, panel.ClientSize.Width);
-        const int margin = 18;
-        const int gap = 26;
-        var cardWidth = Math.Max(460, (pageWidth - margin * 2 - gap) / 2);
-        const int cardHeight = 255;
-        var rightX = margin + cardWidth + gap;
+        var card = NewPanel(RadiusMd, x, y, width, height);
+        card.FillColor = SurfaceCard;
+        card.GradientTopColor = Color.FromArgb(15, 24, 44);
+        card.GradientBottomColor = SurfaceCard;
+        card.BorderColor = BorderSoft;
+        card.HighlightColor = Color.FromArgb(24, 255, 255, 255);
+        card.Controls.Add(MakeLabel(title, 28, 24, width - 56, 34, 18F, FontStyle.Bold, TextMain, ContentAlignment.MiddleCenter, Color.Transparent));
+        card.Controls.Add(MakeWrappedLabel(message, 48, 68, Math.Max(280, width - 96), 44, 11F, FontStyle.Regular, TextMuted, Color.Transparent));
+        card.Controls.Add(MakeButton(buttonText, Math.Max(24, (width - 138) / 2), 112, 138, 38, action, main: true));
+        return card;
+    }
 
-        newScript.Left = pageWidth - 160;
-        newScript.Top = 28;
-        newScript.Width = 158;
-        newScript.Height = 50;
-        openScripts.Left = pageWidth - 292;
-        openScripts.Top = 34;
-        openScripts.Width = 118;
-        openScripts.Height = 38;
-        filterBar.Left = 0;
-        filterBar.Top = 128;
-        filterBar.Width = pageWidth;
-        filterBar.Height = 66;
+    private bool TryGetCurrentManagedModFolder(out string modFolder)
+    {
+        modFolder = _modFolderBox?.Text.Trim() ?? string.Empty;
+        return LuaModService.IsValidModFolder(modFolder);
+    }
 
-        scheduledCard.Visible = filter is "All Scripts" or "Scheduled";
-        backupCard.Visible = filter is "All Scripts" or "Scheduled";
-        webhookCard.Visible = filter is "All Scripts" or "Webhooks";
-        customZone.Visible = filter is "All Scripts" or "Custom";
+    private void OpenManagedScriptsFolder()
+    {
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
+        {
+            LogError("Select a valid mod folder before opening automation scripts.");
+            return;
+        }
 
-        scheduledCard.Left = margin;
-        scheduledCard.Top = 220;
-        scheduledCard.Width = cardWidth;
-        scheduledCard.Height = cardHeight;
-        webhookCard.Left = filter.Equals("Webhooks", StringComparison.Ordinal) ? margin : rightX;
-        webhookCard.Top = 220;
-        webhookCard.Width = cardWidth;
-        webhookCard.Height = cardHeight;
-        backupCard.Left = filter.Equals("Scheduled", StringComparison.Ordinal) ? rightX : margin;
-        backupCard.Top = filter.Equals("Scheduled", StringComparison.Ordinal) ? 220 : 504;
-        backupCard.Width = cardWidth;
-        backupCard.Height = cardHeight;
-        customZone.Left = filter.Equals("Custom", StringComparison.Ordinal) ? margin : rightX;
-        customZone.Top = filter.Equals("Custom", StringComparison.Ordinal) ? 220 : 504;
-        customZone.Width = cardWidth;
-        customZone.Height = cardHeight;
-        notice.Left = 0;
-        notice.Top = filter.Equals("All Scripts", StringComparison.Ordinal) ? 788 : 504;
-        notice.Width = pageWidth;
-        notice.Height = 72;
+        var folder = ScriptManagerService.GetAutomationFolder(modFolder);
+        Directory.CreateDirectory(folder);
+        OpenDirectoryPath(folder, "automation scripts folder");
     }
 
     private static (Control? Icon, Label Label, RoundedPanel Underline) AddScriptFilterTab(Control parent, string text, string icon, int x, bool selected, Action action)
@@ -1668,10 +1790,12 @@ public sealed partial class MainForm : Form
         return (iconControl, label, underline);
     }
 
-    private RoundedPanel BuildScriptCard(string title, string subtitle, string description, string status, ScriptIconKind iconKind, bool enabled, int x, int y, int w, int h)
+    private RoundedPanel BuildScriptCard(ManagedScriptEntry script, int x, int y, int w, int h)
     {
         var normalBorder = Color.FromArgb(28, 40, 70);
         var hoverBorder = Color.FromArgb(96, 86, 158);
+        var enabled = script.Enabled;
+        var subtitle = script.Runtime + " - " + script.Trigger;
         var card = NewPanel(RadiusMd, x, y, w, h);
         card.FillColor = SurfaceCard;
         card.GradientTopColor = Color.FromArgb(16, 25, 46);
@@ -1686,6 +1810,7 @@ public sealed partial class MainForm : Form
         iconBox.GradientBottomColor = Color.FromArgb(14, 21, 40);
         iconBox.BorderColor = Color.FromArgb(42, 52, 88);
         iconBox.HighlightColor = Color.FromArgb(34, 255, 255, 255);
+        var iconKind = ScriptIconFor(script);
         var iconColor = iconKind == ScriptIconKind.Bell ? Color.FromArgb(255, 207, 64) : enabled ? TextMain : TextMuted;
         var iconPanel = new ScriptIconPanel
         {
@@ -1697,7 +1822,7 @@ public sealed partial class MainForm : Form
         iconBox.BackColor = card.FillColor;
         iconBox.Controls.Add(iconPanel);
 
-        var titleLabel = MakeLabel(title, 112, 30, w - 220, 30, 13.5F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent);
+        var titleLabel = MakeLabel(script.Name, 112, 30, w - 220, 30, 13.5F, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, Color.Transparent);
         var subtitleLabel = MakeLabel(subtitle, 112, 60, w - 220, 24, 10.5F, FontStyle.Regular, TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
         var toggle = new ToggleSwitch
         {
@@ -1708,15 +1833,15 @@ public sealed partial class MainForm : Form
             OffColor = Color.FromArgb(38, 45, 73),
             OffColor2 = Color.FromArgb(72, 83, 122)
         };
-        var descriptionLabel = MakeWrappedLabel(description, 28, 118, w - 56, 56, 11.5F, FontStyle.Regular, TextMuted, Color.Transparent);
+        var descriptionLabel = MakeWrappedLabel(script.Description, 28, 118, w - 56, 56, 11.5F, FontStyle.Regular, TextMuted, Color.Transparent);
         var divider = Line(28, h - 62, w - 56);
         var statusDot = MakeLabel("\u25CF", 28, h - 43, 16, 24, 10F, FontStyle.Regular, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
-        var statusLabel = MakeLabel(status == "Active" ? "Active" : "Paused", 46, h - 42, 100, 24, 10F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
-        var duplicateLabel = MakeActionLabel("Duplicate", w - 236, h - 42, 76, 24, TextMuted, () => DuplicateScriptDraft(title, subtitle));
-        var editLabel = MakeActionLabel("Edit", w - 148, h - 42, 44, 24, Color.FromArgb(167, 139, 250), () => ShowScriptEditorDialog(title, subtitle, description, enabled));
-        var runLabel = MakeActionLabel("Run now", w - 96, h - 42, 80, 24, TextMuted, () => ShowScriptRunDialog(title, subtitle, description));
+        var statusLabel = MakeLabel(enabled ? "Active" : "Paused", 46, h - 42, 100, 24, 10F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, Color.Transparent);
+        var duplicateLabel = MakeActionLabel("Duplicate", w - 236, h - 42, 76, 24, TextMuted, () => DuplicateScriptDraft(script));
+        var editLabel = MakeActionLabel("Edit", w - 148, h - 42, 44, 24, Color.FromArgb(167, 139, 250), () => ShowScriptEditorDialog(script));
+        var runLabel = MakeActionLabel("Run now", w - 96, h - 42, 80, 24, TextMuted, () => ShowScriptRunDialog(script));
 
-        void OpenEditor() => ShowScriptEditorDialog(title, subtitle, description, toggle.Checked);
+        void OpenEditor() => ShowScriptEditorDialog(script);
         card.Cursor = Cursors.Hand;
         titleLabel.Cursor = Cursors.Hand;
         descriptionLabel.Cursor = Cursors.Hand;
@@ -1728,7 +1853,8 @@ public sealed partial class MainForm : Form
         descriptionLabel.Click += (_, _) => OpenEditor();
         iconBox.Click += (_, _) => OpenEditor();
         iconPanel.Click += (_, _) => OpenEditor();
-        toggle.CheckedChanged += (_, _) => ShowScriptToggleDialog(title, toggle.Checked);
+        toggle.CheckedChanged += (_, _) => ShowScriptToggleDialog(script, toggle.Checked);
+
         void SetCardHover(bool hover)
         {
             card.BorderColor = hover ? hoverBorder : normalBorder;
@@ -1790,6 +1916,17 @@ public sealed partial class MainForm : Form
         card.Resize += (_, _) => LayoutCard();
         LayoutCard();
         return card;
+    }
+
+    private static ScriptIconKind ScriptIconFor(ManagedScriptEntry script)
+    {
+        return script.Icon switch
+        {
+            "Clock" => ScriptIconKind.Clock,
+            "Bell" => ScriptIconKind.Bell,
+            "Disk" => ScriptIconKind.Disk,
+            _ => ScriptIconKind.Code
+        };
     }
 
     private RoundedPanel BuildCustomScriptDropZone(int x, int y, int w, int h)
@@ -4212,6 +4349,7 @@ public sealed partial class MainForm : Form
             RefreshCategoryEditor();
             RefreshItemList();
             UpdateStatuses();
+            RefreshScriptsView();
             Log("Setup needed: select a valid ItemAndContainerModifier folder.");
             return;
         }
@@ -4249,6 +4387,7 @@ public sealed partial class MainForm : Form
             LogError("Failed loading mod: " + ex.Message);
         }
         UpdateStatuses();
+        RefreshScriptsView();
     }
 
     private void SaveConfig()
@@ -5266,7 +5405,7 @@ public sealed partial class MainForm : Form
     {
         using var popup = NewScriptsDialog("New Script", 560, 420, out var shell);
         shell.Controls.Add(MakeLabel("New Script", 28, 24, 260, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeLabel("Create a local draft in the selected mod Scripts folder.", 30, 62, 430, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel("Create a local automation draft in the selected mod Automation folder.", 30, 62, 470, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
         shell.Controls.Add(MakeLabel("Name", 30, 104, 140, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
         var nameBox = NewTextBox(30, 130, 470, 36);
         nameBox.Text = "custom-script";
@@ -5278,75 +5417,200 @@ public sealed partial class MainForm : Form
         var triggerBox = NewTextBox(280, 204, 220, 36);
         triggerBox.Text = "Manual";
         shell.Controls.Add(triggerBox);
-        shell.Controls.Add(MakeWrappedLabel("The draft is created as a safe starter file. You can edit it manually before running it on a live server.", 30, 262, 470, 54, 10.5F, FontStyle.Regular, TextDim, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel("The draft is created as a safe starter file. You can open it immediately and replace the placeholder content with real automation.", 30, 262, 470, 54, 10.5F, FontStyle.Regular, TextDim, PanelBack));
         shell.Controls.Add(MakeButton("Create Draft", 280, 326, 138, 42, () =>
         {
-            if (CreateScriptDraft(nameBox.Text, Convert.ToString(typeCombo.SelectedItem) ?? "Lua")) popup.Close();
+            if (CreateScriptDraft(nameBox.Text, Convert.ToString(typeCombo.SelectedItem) ?? "Lua", triggerBox.Text)) popup.Close();
         }, main: true));
-        shell.Controls.Add(MakeButton("Open Folder", 430, 326, 110, 42, OpenConfigFolder));
+        shell.Controls.Add(MakeButton("Open Folder", 430, 326, 110, 42, OpenManagedScriptsFolder));
         popup.ShowDialog(this);
     }
 
-    private void ShowScriptEditorDialog(string title, string subtitle, string description, bool enabled)
+    private void ShowScriptEditorDialog(ManagedScriptEntry script)
     {
-        using var popup = NewScriptsDialog(title, 600, 462, out var shell);
-        shell.Controls.Add(MakeLabel(title, 28, 24, 360, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeLabel(subtitle, 30, 62, 480, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeWrappedLabel(description, 30, 102, 520, 56, 11F, FontStyle.Regular, TextMuted, PanelBack));
-        shell.Controls.Add(MakeLabel("Script name", 30, 178, 160, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        var nameBox = NewTextBox(30, 204, 260, 36);
-        nameBox.Text = title;
-        shell.Controls.Add(nameBox);
-        shell.Controls.Add(MakeLabel("Runtime", 320, 178, 160, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        var typeCombo = NewCombo(320, 204, 220, new[] { "Lua", "Batch", "PowerShell" });
-        var runtime = subtitle.Split('-', 2)[0].Trim();
-        var runtimeIndex = Math.Max(0, typeCombo.Items.IndexOf(runtime));
-        typeCombo.SelectedIndex = runtimeIndex;
-        shell.Controls.Add(typeCombo);
-        shell.Controls.Add(MakeLabel("Current state", 30, 260, 160, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeLabel(enabled ? "Enabled" : "Paused", 30, 286, 160, 24, 11F, FontStyle.Bold, enabled ? Green : TextDim, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeWrappedLabel("Save Draft writes a local editable script file. Runtime execution still stays behind the Run Now confirmation window.", 30, 326, 520, 42, 10.5F, FontStyle.Regular, TextDim, PanelBack));
-        shell.Controls.Add(MakeButton("Save Draft", 318, 384, 118, 42, () =>
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
         {
-            if (CreateScriptDraft(nameBox.Text, Convert.ToString(typeCombo.SelectedItem) ?? runtime)) popup.Close();
+            LogError("Select a valid mod folder before editing scripts.");
+            return;
+        }
+
+        var fullPath = ScriptManagerService.ResolveScriptPath(modFolder, script);
+        using var popup = NewScriptsDialog(script.Name, 640, 420, out var shell);
+        shell.Controls.Add(MakeLabel(script.Name, 28, 24, 360, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel(script.Runtime + " - " + script.Trigger, 30, 62, 520, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel(script.Description, 30, 100, 560, 48, 11F, FontStyle.Regular, TextMuted, PanelBack));
+        shell.Controls.Add(MakeLabel("Automation file", 30, 172, 180, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel(CompactPath(fullPath, 86), 30, 198, 560, 40, 10.5F, FontStyle.Regular, TextDim, PanelBack));
+        shell.Controls.Add(MakeLabel("Current state", 30, 256, 160, 22, 10F, FontStyle.Bold, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel(script.Enabled ? "Enabled" : "Paused", 30, 282, 160, 24, 11F, FontStyle.Bold, script.Enabled ? Green : TextDim, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeButton("Open File", 256, 334, 110, 42, () =>
+        {
+            OpenManagedScript(script);
+            popup.Close();
         }, main: true));
-        shell.Controls.Add(MakeButton("Run Now", 450, 384, 100, 42, () => ShowScriptRunDialog(title, subtitle, description)));
+        shell.Controls.Add(MakeButton("Open Folder", 380, 334, 118, 42, () =>
+        {
+            OpenManagedScriptsFolder();
+            popup.Close();
+        }));
+        shell.Controls.Add(MakeButton("Run Now", 512, 334, 88, 42, () =>
+        {
+            popup.Close();
+            ShowScriptRunDialog(script);
+        }));
         popup.ShowDialog(this);
     }
 
-    private void DuplicateScriptDraft(string title, string subtitle)
+    private void DuplicateScriptDraft(ManagedScriptEntry script)
     {
-        var runtime = subtitle.Split('-', 2)[0].Trim();
-        if (CreateScriptDraft(title + " Copy", runtime))
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
         {
-            Log("Duplicated script draft: " + title + ".");
+            LogError("Select a valid mod folder before duplicating scripts.");
+            return;
+        }
+
+        try
+        {
+            var duplicate = ScriptManagerService.DuplicateScript(modFolder, script.Id);
+            RefreshScriptsView();
+            Log("Duplicated script draft: " + duplicate.Name + ".");
+        }
+        catch (Exception ex)
+        {
+            LogError("Script duplicate failed: " + ex.Message);
         }
     }
 
-    private void ShowScriptRunDialog(string title, string subtitle, string description)
+    private void ShowScriptRunDialog(ManagedScriptEntry script)
     {
-        using var popup = NewScriptsDialog("Run Script", 540, 340, out var shell);
-        shell.Controls.Add(MakeLabel("Run " + title, 28, 24, 420, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeLabel(subtitle, 30, 62, 420, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeWrappedLabel(description, 30, 108, 460, 70, 11F, FontStyle.Regular, TextMuted, PanelBack));
-        shell.Controls.Add(MakeWrappedLabel("Review scripts before running them on a live server. This action records the request and keeps execution explicit.", 30, 200, 460, 48, 10.5F, FontStyle.Regular, TextDim, PanelBack));
-        shell.Controls.Add(MakeButton("Run Now", 294, 262, 104, 42, () =>
+        using var popup = NewScriptsDialog("Run Script", 560, 360, out var shell);
+        shell.Controls.Add(MakeLabel("Run " + script.Name, 28, 24, 420, 34, 20, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeLabel(script.Runtime + " - " + script.Trigger, 30, 62, 460, 24, 11F, FontStyle.Regular, TextMuted, ContentAlignment.MiddleLeft, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel(script.Description, 30, 102, 480, 54, 11F, FontStyle.Regular, TextMuted, PanelBack));
+        shell.Controls.Add(MakeWrappedLabel("Batch and PowerShell scripts run directly and write their output to the Status Log. Lua scripts open for manual integration and execution.", 30, 180, 480, 56, 10.5F, FontStyle.Regular, TextDim, PanelBack));
+        shell.Controls.Add(MakeButton("Run Now", 314, 274, 104, 42, () =>
         {
-            Log("Script run requested: " + title + ".");
             popup.Close();
+            RunManagedScript(script);
         }, main: true));
-        shell.Controls.Add(MakeButton("Edit", 412, 262, 82, 42, () => ShowScriptEditorDialog(title, subtitle, description, true)));
+        shell.Controls.Add(MakeButton("Open File", 432, 274, 96, 42, () =>
+        {
+            OpenManagedScript(script);
+            popup.Close();
+        }));
         popup.ShowDialog(this);
     }
 
-    private void ShowScriptToggleDialog(string title, bool enabled)
+    private void RunManagedScript(ManagedScriptEntry script)
     {
-        using var popup = NewScriptsDialog("Script Status", 460, 260, out var shell);
-        shell.Controls.Add(MakeLabel(title, 28, 24, 340, 34, 18, FontStyle.Bold, TextMain, ContentAlignment.MiddleLeft, PanelBack));
-        shell.Controls.Add(MakeWrappedLabel(enabled ? "This automation is now marked active for the local manager view." : "This automation is now paused for the local manager view.", 30, 78, 380, 58, 11F, FontStyle.Regular, TextMuted, PanelBack));
-        shell.Controls.Add(MakeButton("OK", 304, 160, 92, 42, () => popup.Close(), main: true));
-        Log((enabled ? "Enabled script: " : "Paused script: ") + title + ".");
-        popup.ShowDialog(this);
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
+        {
+            LogError("Select a valid mod folder before running scripts.");
+            return;
+        }
+
+        try
+        {
+            var result = ScriptManagerService.RunScript(modFolder, script.Id);
+            if (result.ManualOnly)
+            {
+                OpenManagedScript(script);
+                Log("Lua scripts are manual. Opened script file for " + script.Name + ".");
+                return;
+            }
+
+            if (result.ExitCode == 0)
+            {
+                Log(result.Summary);
+            }
+            else
+            {
+                LogError(result.Summary);
+            }
+
+            var lines = result.Output
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Take(12)
+                .ToArray();
+            foreach (var line in lines)
+            {
+                Log(script.Name + ": " + line);
+            }
+
+            if (lines.Length == 12 && result.Output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries).Length > lines.Length)
+            {
+                Log(script.Name + ": output truncated in the manager log.");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogError("Script run failed: " + ex.Message);
+        }
+    }
+
+    private void OpenManagedScript(ManagedScriptEntry script)
+    {
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
+        {
+            LogError("Select a valid mod folder before opening scripts.");
+            return;
+        }
+
+        var fullPath = ScriptManagerService.ResolveScriptPath(modFolder, script);
+        if (!File.Exists(fullPath))
+        {
+            LogError("Script file does not exist: " + fullPath);
+            RefreshScriptsView();
+            return;
+        }
+
+        Process.Start(ScriptManagerService.CreateEditorStartInfo(fullPath));
+        Log("Opened script file in editor: " + fullPath);
+    }
+
+    private void ShowScriptToggleDialog(ManagedScriptEntry script, bool enabled)
+    {
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
+        {
+            LogError("Select a valid mod folder before changing script status.");
+            RefreshScriptsView();
+            return;
+        }
+
+        try
+        {
+            var updated = ScriptManagerService.SetEnabled(modFolder, script.Id, enabled);
+            Log((enabled ? "Enabled script: " : "Paused script: ") + updated.Name + ".");
+            RefreshScriptsView();
+        }
+        catch (Exception ex)
+        {
+            LogError("Script status update failed: " + ex.Message);
+            RefreshScriptsView();
+        }
+    }
+
+    private bool CreateScriptDraft(string name, string type, string trigger = "Manual")
+    {
+        if (!TryGetCurrentManagedModFolder(out var modFolder))
+        {
+            MessageBox.Show(this, "Select a valid ItemAndContainerModifier folder before creating script drafts.", "Scripts", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            LogError("Select a valid mod folder before creating script drafts.");
+            return false;
+        }
+
+        try
+        {
+            var script = ScriptManagerService.CreateScript(modFolder, name, type, trigger);
+            RefreshScriptsView();
+            Log("Created script draft: " + script.Name + ".");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogError("Script draft creation failed: " + ex.Message);
+            return false;
+        }
     }
 
     private Form NewScriptsDialog(string title, int width, int height, out RoundedPanel shell)
@@ -5377,48 +5641,6 @@ public sealed partial class MainForm : Form
         return popup;
     }
 
-    private bool CreateScriptDraft(string name, string type)
-    {
-        var modFolder = _modFolderBox?.Text.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(modFolder) || !Directory.Exists(modFolder))
-        {
-            MessageBox.Show(this, "Select a valid ItemAndContainerModifier folder before creating script drafts.", "Scripts", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            LogError("Select a valid mod folder before creating script drafts.");
-            return false;
-        }
-
-        var scripts = Path.Combine(modFolder, "Scripts");
-
-        Directory.CreateDirectory(scripts);
-        var safeName = SafeScriptFileName(name);
-        var extension = ScriptExtension(type);
-        var path = UniqueScriptPath(scripts, safeName, extension);
-        File.WriteAllText(path, ScriptDraftContent(type, safeName));
-        Log("Created script draft: " + path);
-        return true;
-    }
-
-    private static string SafeScriptFileName(string name)
-    {
-        var safe = Regex.Replace(name.Trim(), @"[^A-Za-z0-9._-]+", "-").Trim('-', '.', '_');
-        return string.IsNullOrWhiteSpace(safe) ? "custom-script" : safe;
-    }
-
-    private static string ScriptExtension(string type) => type switch
-    {
-        "Batch" => ".bat",
-        "PowerShell" => ".ps1",
-        _ => ".lua"
-    };
-
-    private static string UniqueScriptPath(string folder, string name, string extension)
-    {
-        var path = Path.Combine(folder, name + extension);
-        if (!File.Exists(path)) return path;
-        var suffix = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-        return Path.Combine(folder, name + "-" + suffix + extension);
-    }
-
     private static Label MakeActionLabel(string text, int x, int y, int w, int h, Color color, Action action)
     {
         var normalColor = color;
@@ -5431,12 +5653,6 @@ public sealed partial class MainForm : Form
         return label;
     }
 
-    private static string ScriptDraftContent(string type, string name) => type switch
-    {
-        "Batch" => "@echo off\r\necho VEIN script draft: " + name + "\r\n",
-        "PowerShell" => "Write-Host \"VEIN script draft: " + name + "\"\r\n",
-        _ => "print(\"VEIN script draft: " + name + "\")\n"
-    };
 
     private static RoundedPanel NewPresetCard(string title, string description, int x, int y, Action action)
     {

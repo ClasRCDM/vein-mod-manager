@@ -231,6 +231,12 @@ public sealed class VeinLogoPanel : Control
     public Color GlowColor { get; set; } = Color.FromArgb(185, 24, 38);
     public Color MainColor { get; set; } = Color.White;
     public Color AccentColor { get; set; } = Color.FromArgb(185, 24, 38);
+    public Color FrameColor { get; set; } = Color.FromArgb(8, 10, 18);
+    public Color BorderColor { get; set; } = Color.FromArgb(92, 32, 48);
+    public Color HighlightColor { get; set; } = Color.FromArgb(34, 255, 255, 255);
+    public Image? LogoImage { get; set; }
+    public int Radius { get; set; } = 12;
+    public int ImageBleed { get; set; } = 22;
 
     public VeinLogoPanel()
     {
@@ -242,6 +248,13 @@ public sealed class VeinLogoPanel : Control
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+
+        if (LogoImage != null)
+        {
+            DrawImageLogo(e.Graphics);
+            return;
+        }
 
         using var glowPath = new GraphicsPath();
         glowPath.AddEllipse(4, 24, Math.Max(1, Width - 8), 76);
@@ -264,6 +277,44 @@ public sealed class VeinLogoPanel : Control
         e.Graphics.DrawString("VEIN", veinFont, shadowBrush, shadowRect, format);
         e.Graphics.DrawString("VEIN", veinFont, mainBrush, veinRect, format);
         e.Graphics.DrawString("MOD MANAGER", subFont, subBrush, new RectangleF(0, 88, Width, 30), format);
+    }
+
+    private void DrawImageLogo(Graphics graphics)
+    {
+        var frameRect = new Rectangle(2, 2, Math.Max(1, Width - 5), Math.Max(1, Height - 5));
+        var glowRect = Rectangle.Inflate(frameRect, 10, 10);
+        using var glowPath = RoundedPanel.RoundedRect(glowRect, Radius + 10);
+        using var glowBrush = new PathGradientBrush(glowPath)
+        {
+            CenterColor = Color.FromArgb(118, GlowColor),
+            SurroundColors = new[] { Color.FromArgb(0, GlowColor) }
+        };
+        graphics.FillPath(glowBrush, glowPath);
+
+        using var framePath = RoundedPanel.RoundedRect(frameRect, Radius);
+        using var fill = new LinearGradientBrush(frameRect, Color.FromArgb(26, 8, 16), FrameColor, LinearGradientMode.Vertical);
+        graphics.FillPath(fill, framePath);
+
+        var state = graphics.Save();
+        graphics.SetClip(framePath);
+        var imageBounds = CoverImageBounds(LogoImage!.Size, Rectangle.Inflate(frameRect, ImageBleed, ImageBleed));
+        graphics.DrawImage(LogoImage!, imageBounds);
+        using var shade = new LinearGradientBrush(frameRect, Color.FromArgb(0, Color.Black), Color.FromArgb(92, Color.Black), LinearGradientMode.Vertical);
+        graphics.FillPath(shade, framePath);
+        graphics.Restore(state);
+
+        using var border = new Pen(BorderColor, 1.4f);
+        graphics.DrawPath(border, framePath);
+        using var highlight = new Pen(HighlightColor, 1f);
+        graphics.DrawPath(highlight, framePath);
+    }
+
+    private static RectangleF CoverImageBounds(Size imageSize, Rectangle target)
+    {
+        var scale = Math.Max(target.Width / (float)Math.Max(1, imageSize.Width), target.Height / (float)Math.Max(1, imageSize.Height));
+        var width = imageSize.Width * scale;
+        var height = imageSize.Height * scale;
+        return new RectangleF(target.Left + (target.Width - width) / 2f, target.Top + (target.Height - height) / 2f, width, height);
     }
     protected override void OnPaintBackground(PaintEventArgs pevent)
     {

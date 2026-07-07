@@ -1,0 +1,34 @@
+{
+  "scripts": [
+    {
+      "id": "4076c86e903d42ac95425067bdb7f9f7",
+      "name": "Scheduled Restart",
+      "relativePath": "scheduled-restart.bat",
+      "runtime": "Batch",
+      "trigger": "Every 6 hours",
+      "description": "Gracefully warns players, saves the world and restarts the server process on a fixed interval to clear memory.",
+      "icon": "Clock",
+      "enabled": true
+    },
+    {
+      "id": "bc5207af453c4b828cbc2944be9f5500",
+      "name": "Discord Status Webhook",
+      "relativePath": "discord-status-webhook.lua",
+      "runtime": "Lua",
+      "trigger": "On player join/leave",
+      "description": "Posts live player count, server status and join notifications to a configured Discord channel.",
+      "icon": "Bell",
+      "enabled": true
+    },
+    {
+      "id": "6bc964080fcd469a8937772d5ecd9261",
+      "name": "Nightly Backup",
+      "relativePath": "nightly-backup.ps1",
+      "runtime": "PowerShell",
+      "trigger": "Daily at 04:00",
+      "description": "Zips the save folder and config files to a timestamped archive, keeping the last 14 days of backups.",
+      "icon": "Disk",
+      "enabled": false
+    }
+  ]
+}
